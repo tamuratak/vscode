@@ -971,6 +971,10 @@ export class SuggestWidget implements IContentWidget, IListVirtualDelegate<Compl
 		show(this.details.element);
 		this.details.render(this.list.getFocusedElements()[0]);
 		this.details.element.style.maxHeight = this.maxWidgetHeight + 'px';
+		const detailWidth = Math.max((this.editor.getLayoutInfo().width - this.listWidth)*0.66, this.listWidth);
+		this.element.style.width = `${detailWidth + this.listWidth}px`;
+		this.listElement.style.width = `${this.listWidth}px`;
+		this.details.element.style.width = `${detailWidth}px`;
 
 		// Reset margin-top that was set as Fix for #26416
 		this.listElement.style.marginTop = '0px';
