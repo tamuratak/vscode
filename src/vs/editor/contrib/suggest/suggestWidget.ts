@@ -1100,6 +1100,7 @@ export class SuggestWidget implements IContentWidget, IListVirtualDelegate<Compl
 			// Docs is bigger than list and widget is above cursor, apply margin-top so that list appears right above cursor
 			this.listElement.style.marginTop = `${this.details.element.offsetHeight - this.listElement.offsetHeight}px`;
 		}
+		this.details.element.style.maxHeight = `${Math.max(this.editor.getLayoutInfo().height - this.listElement.offsetHeight - 10, this.maxWidgetHeight)}px`;
 	}
 
 	/**
