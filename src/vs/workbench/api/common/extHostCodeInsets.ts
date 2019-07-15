@@ -110,6 +110,7 @@ export class ExtHostEditorInsets implements ExtHostEditorInsetsShape {
 			dispose(): void {
 				if (that._insets.has(handle)) {
 					that._insets.delete(handle);
+					that._proxy.$disposeWebview(handle);
 					that._proxy.$disposeEditorInset(handle);
 					onDidDispose.fire();
 

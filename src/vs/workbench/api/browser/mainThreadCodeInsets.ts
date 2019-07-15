@@ -54,7 +54,7 @@ export class MainThreadEditorInsets implements MainThreadEditorInsetsShape {
 
 	private readonly _proxy: ExtHostEditorInsetsShape;
 	private readonly _disposables = new DisposableStore();
-	private readonly _insets = new Map<number, { inset: EditorWebviewZone, disposableStore: DisposableStore }>();
+	private readonly _insets = new Map<number, EditorWebviewZone>();
 
 	constructor(
 		context: IExtHostContext,
@@ -98,7 +98,7 @@ export class MainThreadEditorInsets implements MainThreadEditorInsetsShape {
 		disposables.add(editor.onDidDispose(remove));
 		disposables.add(webviewZone);
 
-		this._insets.set(handle, { inset: webviewZone, disposableStore: disposables });
+		this._insets.set(handle, webviewZone);
 	}
 
 	$disposeEditorInset(handle: number): void {
@@ -125,9 +125,6 @@ export class MainThreadEditorInsets implements MainThreadEditorInsetsShape {
 
 		inset.webview = webview;
 		webview.mountTo(inset.domNode);
-		const disposables = this.getDisposable(handle);
-		disposables.add(webview);
-		disposables.add(webview.onMessage(msg => this._proxy.$onDidReceiveMessage(handle, msg)));
 		return true;
 	}
 
@@ -163,18 +160,11 @@ export class MainThreadEditorInsets implements MainThreadEditorInsetsShape {
 	}
 
 	private getInset(handle: number): EditorWebviewZone {
-		const insetObj = this._insets.get(handle);
-		if (!insetObj) {
+		const inset = this._insets.get(handle);
+		if (!inset) {
 			throw new Error('Unknown inset');
 		}
-		return insetObj.inset;
+		return inset;
 	}
 
-	private getDisposable(handle: number) {
-		const insetObj = this._insets.get(handle);
-		if (!insetObj) {
-			throw new Error('Unknown inset');
-		}
-		return insetObj.disposableStore;
-	}
 }
