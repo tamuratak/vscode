@@ -20,6 +20,7 @@ class EditorWebviewZone implements IViewZone {
 	readonly afterLineNumber: number;
 	readonly afterColumn: number;
 	readonly heightInLines: number;
+	webview: Webview | undefined;
 
 	private _id: number;
 	// suppressMouseDown?: boolean | undefined;
@@ -33,7 +34,6 @@ class EditorWebviewZone implements IViewZone {
 		readonly editor: IActiveCodeEditor,
 		readonly line: number,
 		readonly height: number,
-		readonly webview: Webview,
 	) {
 		this.domNode = document.createElement('div');
 		this.domNode.style.zIndex = '10'; // without this, the webview is not interactive
@@ -42,7 +42,6 @@ class EditorWebviewZone implements IViewZone {
 		this.heightInLines = height;
 
 		editor.changeViewZones(accessor => this._id = accessor.addZone(this));
-		webview.mountTo(this.domNode);
 	}
 
 	dispose(): void {
@@ -55,7 +54,7 @@ export class MainThreadEditorInsets implements MainThreadEditorInsetsShape {
 
 	private readonly _proxy: ExtHostEditorInsetsShape;
 	private readonly _disposables = new DisposableStore();
-	private readonly _insets = new Map<number, EditorWebviewZone>();
+	private readonly _insets = new Map<number, { inset: EditorWebviewZone, disposableStore: DisposableStore }>();
 
 	constructor(
 		context: IExtHostContext,
@@ -87,17 +86,7 @@ export class MainThreadEditorInsets implements MainThreadEditorInsetsShape {
 		}
 
 		const disposables = new DisposableStore();
-
-		const webview = this._webviewService.createWebview('' + handle, {
-			enableFindWidget: false,
-			allowSvgs: false,
-			extension: { id: extensionId, location: URI.revive(extensionLocation) }
-		}, {
-				allowScripts: options.enableScripts,
-				localResourceRoots: options.localResourceRoots ? options.localResourceRoots.map(uri => URI.revive(uri)) : undefined
-			});
-
-		const webviewZone = new EditorWebviewZone(editor, line, height, webview);
+		const webviewZone = new EditorWebviewZone(editor, line, height);
 
 		const remove = () => {
 			disposables.dispose();
@@ -108,10 +97,8 @@ export class MainThreadEditorInsets implements MainThreadEditorInsetsShape {
 		disposables.add(editor.onDidChangeModel(remove));
 		disposables.add(editor.onDidDispose(remove));
 		disposables.add(webviewZone);
-		disposables.add(webview);
-		disposables.add(webview.onMessage(msg => this._proxy.$onDidReceiveMessage(handle, msg)));
 
-		this._insets.set(handle, webviewZone);
+		this._insets.set(handle, { inset: webviewZone, disposableStore: disposables });
 	}
 
 	$disposeEditorInset(handle: number): void {
@@ -121,28 +108,73 @@ export class MainThreadEditorInsets implements MainThreadEditorInsetsShape {
 
 	}
 
+	async $createWebView(handle: number, options: modes.IWebviewOptions, extensionId: ExtensionIdentifier, extensionLocation: UriComponents): Promise<boolean> {
+		const inset = this.getInset(handle);
+		if (inset.webview) {
+			return false;
+		}
+
+		const webview = this._webviewService.createWebview('' + handle, {
+			enableFindWidget: false,
+			allowSvgs: false,
+			extension: { id: extensionId, location: URI.revive(extensionLocation) }
+		}, {
+				allowScripts: options.enableScripts,
+				localResourceRoots: options.localResourceRoots ? options.localResourceRoots.map(uri => URI.revive(uri)) : undefined
+			});
+
+		webview.mountTo(inset.domNode);
+		console.log('mounted!!\n\n');
+		const disposables = this.getDisposable(handle);
+		disposables.add(webview);
+		disposables.add(webview.onMessage(msg => this._proxy.$onDidReceiveMessage(handle, msg)));
+		return true;
+	}
+
+	$disposeWebview(handle: number): void {
+		const inset = this.getInset(handle);
+		if (inset.webview) {
+			inset.webview.dispose();
+			inset.webview = undefined;
+		}
+	}
+
 	$setHtml(handle: number, value: string): void {
 		const inset = this.getInset(handle);
-		inset.webview.html = value;
-
+		if (inset.webview) {
+			inset.webview.html = value;
+		}
 	}
 
 	$setOptions(handle: number, options: modes.IWebviewOptions): void {
 		const inset = this.getInset(handle);
-		inset.webview.options = options;
+		if (inset.webview) {
+			inset.webview.options = options;
+		}
 	}
 
 	async $postMessage(handle: number, value: any): Promise<boolean> {
 		const inset = this.getInset(handle);
-		inset.webview.sendMessage(value);
-		return true;
+		if (inset.webview) {
+			inset.webview.sendMessage(value);
+			return true;
+		}
+		return false;
 	}
 
 	private getInset(handle: number): EditorWebviewZone {
-		const inset = this._insets.get(handle);
-		if (!inset) {
+		const insetObj = this._insets.get(handle);
+		if (!insetObj) {
 			throw new Error('Unknown inset');
 		}
-		return inset;
+		return insetObj.inset;
+	}
+
+	private getDisposable(handle: number) {
+		const insetObj = this._insets.get(handle);
+		if (!insetObj) {
+			throw new Error('Unknown inset');
+		}
+		return insetObj.disposableStore;
 	}
 }

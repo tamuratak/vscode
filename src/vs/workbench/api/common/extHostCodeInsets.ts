@@ -41,7 +41,7 @@ export class ExtHostEditorInsets implements ExtHostEditorInsetsShape {
 		this._disposables.dispose();
 	}
 
-	createWebviewEditorInset(editor: vscode.TextEditor, line: number, height: number, options: vscode.WebviewOptions | undefined, extension: IExtensionDescription): vscode.WebviewEditorInset {
+	createWebviewEditorInset(editor: vscode.TextEditor, line: number, height: number, options: vscode.WebviewOptions | undefined, extension: IExtensionDescription) {
 
 		let apiEditor: ExtHostTextEditor | undefined;
 		for (const candidate of this._editors.getVisibleTextEditors()) {
@@ -105,7 +105,6 @@ export class ExtHostEditorInsets implements ExtHostEditorInsetsShape {
 			readonly editor: vscode.TextEditor = editor;
 			readonly line: number = line;
 			readonly height: number = height;
-			readonly webview: vscode.Webview = webview;
 			readonly onDidDispose: vscode.Event<void> = onDidDispose.event;
 
 			dispose(): void {
@@ -124,7 +123,17 @@ export class ExtHostEditorInsets implements ExtHostEditorInsetsShape {
 		this._proxy.$createEditorInset(handle, apiEditor.id, apiEditor.document.uri, line + 1, height, options || {}, extension.identifier, extension.extensionLocation);
 		this._insets.set(handle, { editor, inset, onDidReceiveMessage });
 
-		return inset;
+		const createWebview = async () => {
+			const result = await this._proxy.$createWebView(handle, options || {}, extension.identifier, extension.extensionLocation);
+			return result;
+		};
+
+		const disposeWebview = () => {
+			this._proxy.$disposeWebview(handle);
+		};
+
+		const wv: vscode.Webview = webview;
+		return { inset, webview: wv, createWebview, disposeWebview };
 	}
 
 	$onDidDispose(handle: number): void {

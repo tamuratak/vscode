@@ -526,9 +526,43 @@ export function createApiFactory(
 			createWebviewPanel(viewType: string, title: string, showOptions: vscode.ViewColumn | { viewColumn: vscode.ViewColumn, preserveFocus?: boolean }, options: vscode.WebviewPanelOptions & vscode.WebviewOptions): vscode.WebviewPanel {
 				return extHostWebviews.createWebviewPanel(extension, viewType, title, showOptions, options);
 			},
-			createWebviewTextEditorInset(editor: vscode.TextEditor, line: number, height: number, options: vscode.WebviewOptions): vscode.WebviewEditorInset {
+			createWebviewTextEditorInset(editor: vscode.TextEditor, line: number, height: number, callback: (webview: vscode.Webview) => void, options: vscode.WebviewOptions): vscode.WebviewEditorInset {
 				checkProposedApiEnabled(extension);
-				return extHostEditorInsets.createWebviewEditorInset(editor, line, height, options, extension);
+				const { inset, webview, createWebview } = extHostEditorInsets.createWebviewEditorInset(editor, line, height, options, extension);
+				//				const insetRangeWithMargin = new extHostTypes.Range(Math.max(line - 10, 0), 0, line + height + 10, 0);
+				createWebview().then((created) => {
+					if (created) {
+						callback(webview);
+					}
+				});
+				/*				for (const range of editor.visibleRanges) {
+									if (range.intersection(insetRangeWithMargin)) {
+										createWebview().then((created) => {
+											if (created) {
+												callback(webview);
+											}
+										})
+										break;
+									}
+								}
+								const disposable = window.onDidChangeTextEditorVisibleRanges((e) => {
+									if (e.textEditor !== editor) {
+										return;
+									}
+									for (const range of e.visibleRanges) {
+										if (range.intersection(insetRangeWithMargin)) {
+											createWebview().then((created) => {
+												if (created) {
+													callback(webview);
+												}
+											})
+											return;
+										}
+									}
+									disposeWebview();
+								})
+								inset.onDidDispose(() => disposable.dispose()); */
+				return inset;
 			},
 			createTerminal(nameOrOptions?: vscode.TerminalOptions | vscode.TerminalVirtualProcessOptions | string, shellPath?: string, shellArgs?: string[] | string): vscode.Terminal {
 				if (typeof nameOrOptions === 'object') {
