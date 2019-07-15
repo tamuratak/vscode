@@ -541,7 +541,14 @@ export function createApiFactory(
 						break;
 					}
 				}
+				let prevPos: number | undefined;
 				const disposable = window.onDidChangeTextEditorVisibleRanges((e) => {
+					if (prevPos === undefined) {
+						prevPos = e.visibleRanges[0].start.line;
+					}
+					if (Math.abs(prevPos - e.visibleRanges[0].start.line) < 5) {
+						return;
+					}
 					if (e.textEditor !== editor) {
 						return;
 					}
