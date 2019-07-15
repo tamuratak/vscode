@@ -123,8 +123,8 @@ export class MainThreadEditorInsets implements MainThreadEditorInsetsShape {
 				localResourceRoots: options.localResourceRoots ? options.localResourceRoots.map(uri => URI.revive(uri)) : undefined
 			});
 
+		inset.webview = webview;
 		webview.mountTo(inset.domNode);
-		console.log('mounted!!\n\n');
 		const disposables = this.getDisposable(handle);
 		disposables.add(webview);
 		disposables.add(webview.onMessage(msg => this._proxy.$onDidReceiveMessage(handle, msg)));
