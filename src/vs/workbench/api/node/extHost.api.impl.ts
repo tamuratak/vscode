@@ -529,7 +529,7 @@ export function createApiFactory(
 			createWebviewTextEditorInset(editor: vscode.TextEditor, line: number, height: number, callback: (webview: vscode.Webview) => void, options: vscode.WebviewOptions): vscode.WebviewEditorInset {
 				checkProposedApiEnabled(extension);
 				const { inset, webview, createWebview, disposeWebview } = extHostEditorInsets.createWebviewEditorInset(editor, line, height, options, extension);
-				const insetRangeWithMargin = new extHostTypes.Range(Math.max(line - 10, 0), 0, line + height + 10, 0);
+				const insetRangeWithMargin = new extHostTypes.Range(Math.max(line - 50, 0), 0, line + height + 50, 0);
 
 				for (const range of editor.visibleRanges) {
 					if (range.intersection(insetRangeWithMargin)) {
