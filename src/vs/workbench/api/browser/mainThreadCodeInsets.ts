@@ -90,8 +90,10 @@ export class MainThreadEditorInsets implements MainThreadEditorInsetsShape {
 
 		webviewZone.onDomNodeTop = (top) => {
 			if (top >= 0) {
-				this.$createWebView(handle, options, extensionId, extensionLocation).then(() => {
-					this._proxy.$onDidCreateWebview(handle);
+				this._createWebView(handle, options, extensionId, extensionLocation).then((created) => {
+					if (created) {
+						this._proxy.$onDidCreateWebview(handle);
+					}
 				});
 			} else {
 				this.$disposeWebview(handle);
@@ -119,7 +121,7 @@ export class MainThreadEditorInsets implements MainThreadEditorInsetsShape {
 
 	}
 
-	async $createWebView(handle: number, options: modes.IWebviewOptions, extensionId: ExtensionIdentifier, extensionLocation: UriComponents): Promise<boolean> {
+	private async _createWebView(handle: number, options: modes.IWebviewOptions, extensionId: ExtensionIdentifier, extensionLocation: UriComponents): Promise<boolean> {
 		const inset = this.getInset(handle);
 		if (inset.webview) {
 			return false;
@@ -177,5 +179,4 @@ export class MainThreadEditorInsets implements MainThreadEditorInsetsShape {
 		}
 		return inset;
 	}
-
 }
