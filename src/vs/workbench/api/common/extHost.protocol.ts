@@ -525,6 +525,8 @@ export interface MainThreadEditorInsetsShape extends IDisposable {
 }
 
 export interface ExtHostEditorInsetsShape {
+	$onDidCreateWebview(handle: number): void;
+	$onDidDisposeWebview(handle: number): void;
 	$onDidDispose(handle: number): void;
 	$onDidReceiveMessage(handle: number, message: any): void;
 }

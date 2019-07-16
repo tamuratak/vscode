@@ -528,44 +528,7 @@ export function createApiFactory(
 			},
 			createWebviewTextEditorInset(editor: vscode.TextEditor, line: number, height: number, callback: (webview: vscode.Webview) => void, options: vscode.WebviewOptions): vscode.WebviewEditorInset {
 				checkProposedApiEnabled(extension);
-				const { inset, webview, createWebview, disposeWebview } = extHostEditorInsets.createWebviewEditorInset(editor, line, height, options, extension);
-				const insetRangeWithMargin = new extHostTypes.Range(Math.max(line - 50, 0), 0, line + height + 50, 0);
-
-				for (const range of editor.visibleRanges) {
-					if (range.intersection(insetRangeWithMargin)) {
-						createWebview().then((created) => {
-							if (created) {
-								callback(webview);
-							}
-						});
-						break;
-					}
-				}
-				let prevPos: number | undefined;
-				const disposable = window.onDidChangeTextEditorVisibleRanges((e) => {
-					if (prevPos === undefined) {
-						prevPos = e.visibleRanges[0].start.line;
-					}
-					if (Math.abs(prevPos - e.visibleRanges[0].start.line) < 5) {
-						return;
-					}
-					if (e.textEditor !== editor) {
-						return;
-					}
-					for (const range of e.visibleRanges) {
-						if (range.intersection(insetRangeWithMargin)) {
-							createWebview().then((created) => {
-								if (created) {
-									callback(webview);
-								}
-							});
-							return;
-						}
-					}
-					disposeWebview();
-				});
-				inset.onDidDispose(() => disposable.dispose());
-				return inset;
+				return extHostEditorInsets.createWebviewEditorInset(editor, line, height, callback, options, extension);
 			},
 			createTerminal(nameOrOptions?: vscode.TerminalOptions | vscode.TerminalVirtualProcessOptions | string, shellPath?: string, shellArgs?: string[] | string): vscode.Terminal {
 				if (typeof nameOrOptions === 'object') {

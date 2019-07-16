@@ -17,7 +17,7 @@ export class ExtHostEditorInsets implements ExtHostEditorInsetsShape {
 
 	private _handlePool = 0;
 	private _disposables = new DisposableStore();
-	private _insets = new Map<number, { editor: vscode.TextEditor, inset: vscode.WebviewEditorInset, onDidReceiveMessage: Emitter<any> }>();
+	private _insets = new Map<number, { editor: vscode.TextEditor, inset: vscode.WebviewEditorInset, onDidReceiveMessage: Emitter<any>, callback: (webview: vscode.Webview) => void }>();
 
 	constructor(
 		private readonly _proxy: MainThreadEditorInsetsShape,
@@ -41,7 +41,7 @@ export class ExtHostEditorInsets implements ExtHostEditorInsetsShape {
 		this._disposables.dispose();
 	}
 
-	createWebviewEditorInset(editor: vscode.TextEditor, line: number, height: number, options: vscode.WebviewOptions | undefined, extension: IExtensionDescription) {
+	createWebviewEditorInset(editor: vscode.TextEditor, line: number, height: number, callback: (webview: vscode.Webview) => void, options: vscode.WebviewOptions | undefined, extension: IExtensionDescription) {
 
 		let apiEditor: ExtHostTextEditor | undefined;
 		for (const candidate of this._editors.getVisibleTextEditors()) {
@@ -59,6 +59,41 @@ export class ExtHostEditorInsets implements ExtHostEditorInsetsShape {
 		const onDidReceiveMessage = new Emitter<any>();
 		const onDidDispose = new Emitter<void>();
 
+		const inset = new class implements vscode.WebviewEditorInset {
+
+			readonly editor: vscode.TextEditor = editor;
+			readonly line: number = line;
+			readonly height: number = height;
+			readonly onDidDispose: vscode.Event<void> = onDidDispose.event;
+			webview: vscode.Webview | undefined;
+
+			dispose(): void {
+				if (that._insets.has(handle)) {
+					that._insets.delete(handle);
+					that._proxy.$disposeWebview(handle);
+					that._proxy.$disposeEditorInset(handle);
+					onDidDispose.fire();
+
+					// final cleanup
+					onDidDispose.dispose();
+					onDidReceiveMessage.dispose();
+				}
+			}
+		};
+
+		this._proxy.$createEditorInset(handle, apiEditor.id, apiEditor.document.uri, line + 1, height, options || {}, extension.identifier, extension.extensionLocation);
+		this._insets.set(handle, { editor, inset, onDidReceiveMessage, callback });
+
+		return inset;
+	}
+
+	$onDidCreateWebview(handle: number): void {
+		const value = this._insets.get(handle);
+		if (!value) {
+			return;
+		}
+		const onDidReceiveMessage = value.onDidReceiveMessage;
+		const that = this;
 		const webview = new class implements vscode.Webview {
 
 			private readonly _uuid = generateUuid();
@@ -99,42 +134,15 @@ export class ExtHostEditorInsets implements ExtHostEditorInsetsShape {
 				return that._proxy.$postMessage(handle, message);
 			}
 		};
+		value.inset.webview = webview;
+		value.callback(webview);
+	}
 
-		const inset = new class implements vscode.WebviewEditorInset {
-
-			readonly editor: vscode.TextEditor = editor;
-			readonly line: number = line;
-			readonly height: number = height;
-			readonly onDidDispose: vscode.Event<void> = onDidDispose.event;
-
-			dispose(): void {
-				if (that._insets.has(handle)) {
-					that._insets.delete(handle);
-					that._proxy.$disposeWebview(handle);
-					that._proxy.$disposeEditorInset(handle);
-					onDidDispose.fire();
-
-					// final cleanup
-					onDidDispose.dispose();
-					onDidReceiveMessage.dispose();
-				}
-			}
-		};
-
-		this._proxy.$createEditorInset(handle, apiEditor.id, apiEditor.document.uri, line + 1, height, options || {}, extension.identifier, extension.extensionLocation);
-		this._insets.set(handle, { editor, inset, onDidReceiveMessage });
-
-		const createWebview = async () => {
-			const result = await this._proxy.$createWebView(handle, options || {}, extension.identifier, extension.extensionLocation);
-			return result;
-		};
-
-		const disposeWebview = () => {
-			this._proxy.$disposeWebview(handle);
-		};
-
-		const wv: vscode.Webview = webview;
-		return { inset, webview: wv, createWebview, disposeWebview };
+	$onDidDisposeWebview(handle: number): void {
+		const value = this._insets.get(handle);
+		if (value) {
+			value.inset.webview = undefined;
+		}
 	}
 
 	$onDidDispose(handle: number): void {

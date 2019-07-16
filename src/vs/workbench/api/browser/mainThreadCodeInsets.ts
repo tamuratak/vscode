@@ -27,7 +27,7 @@ class EditorWebviewZone implements IViewZone {
 	// heightInPx?: number | undefined;
 	// minWidthInPx?: number | undefined;
 	// marginDomNode?: HTMLElement | null | undefined;
-	// onDomNodeTop?: ((top: number) => void) | undefined;
+	onDomNodeTop?: ((top: number) => void) | undefined;
 	// onComputedHeight?: ((height: number) => void) | undefined;
 
 	constructor(
@@ -87,6 +87,17 @@ export class MainThreadEditorInsets implements MainThreadEditorInsetsShape {
 
 		const disposables = new DisposableStore();
 		const webviewZone = new EditorWebviewZone(editor, line, height);
+
+		webviewZone.onDomNodeTop = (top) => {
+			if (top >= 0) {
+				this.$createWebView(handle, options, extensionId, extensionLocation).then(() => {
+					this._proxy.$onDidCreateWebview(handle);
+				});
+			} else {
+				this.$disposeWebview(handle);
+				this._proxy.$onDidDisposeWebview(handle);
+			}
+		};
 
 		const remove = () => {
 			disposables.dispose();
