@@ -544,10 +544,11 @@ export function createApiFactory(
 				let prevPos: number | undefined;
 				const disposable = window.onDidChangeTextEditorVisibleRanges((e) => {
 					if (prevPos === undefined) {
-						prevPos = e.visibleRanges[0].start.line;
-					}
-					if (Math.abs(prevPos - e.visibleRanges[0].start.line) < 5) {
-						return;
+						prevPos = Date.now();
+					} else {
+						if (Math.abs(Date.now() - prevPos) < 100) {
+							return;
+						}
 					}
 					if (e.textEditor !== editor) {
 						return;
