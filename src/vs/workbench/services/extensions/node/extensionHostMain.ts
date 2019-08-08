@@ -5,8 +5,7 @@
 
 import { timeout } from 'vs/base/common/async';
 import * as errors from 'vs/base/common/errors';
-import { IDisposable, dispose } from 'vs/base/common/lifecycle';
-import { Counter } from 'vs/base/common/numbers';
+import { DisposableStore } from 'vs/base/common/lifecycle';
 import { URI, setUriThrowOnMissingScheme } from 'vs/base/common/uri';
 import { IURITransformer } from 'vs/base/common/uriIpc';
 import { IMessagePassingProtocol } from 'vs/base/parts/ipc/common/ipc';
@@ -19,7 +18,6 @@ import { RPCProtocol } from 'vs/workbench/services/extensions/common/rpcProtocol
 import { IExtensionDescription } from 'vs/platform/extensions/common/extensions';
 import { withNullAsUndefined } from 'vs/base/common/types';
 import { ILogService } from 'vs/platform/log/common/log';
-import { ISchemeTransformer } from 'vs/workbench/api/common/extHostLanguageFeatures';
 
 // we don't (yet) throw when extensions parse
 // uris that have no scheme
@@ -42,10 +40,7 @@ export class ExtensionHostMain {
 	private _isTerminating: boolean;
 	private readonly _hostUtils: IHostUtils;
 	private readonly _extensionService: ExtHostExtensionService;
-	private readonly _extHostLogService: ExtHostLogService;
-	private disposables: IDisposable[] = [];
-
-	private _searchRequestIdProvider: Counter;
+	private readonly _disposables = new DisposableStore();
 
 	constructor(
 		protocol: IMessagePassingProtocol,
@@ -53,29 +48,26 @@ export class ExtensionHostMain {
 		hostUtils: IHostUtils,
 		consolePatchFn: IConsolePatchFn,
 		logServiceFn: ILogServiceFn,
-		uriTransformer: IURITransformer | null,
-		schemeTransformer: ISchemeTransformer | null,
-		outputChannelName: string,
+		uriTransformer: IURITransformer | null
 	) {
 		this._isTerminating = false;
 		this._hostUtils = hostUtils;
 		const rpcProtocol = new RPCProtocol(protocol, null, uriTransformer);
 
 		// ensure URIs are transformed and revived
-		initData = this.transform(initData, rpcProtocol);
+		initData = ExtensionHostMain._transform(initData, rpcProtocol);
 
 		// allow to patch console
 		consolePatchFn(rpcProtocol.getProxy(MainContext.MainThreadConsole));
 
 		// services
-		this._extHostLogService = new ExtHostLogService(logServiceFn(initData), initData.logsLocation.fsPath);
-		this.disposables.push(this._extHostLogService);
+		const extHostLogService = new ExtHostLogService(logServiceFn(initData), initData.logsLocation.fsPath);
+		this._disposables.add(extHostLogService);
 
-		this._searchRequestIdProvider = new Counter();
-		const extHostWorkspace = new ExtHostWorkspace(rpcProtocol, this._extHostLogService, this._searchRequestIdProvider, withNullAsUndefined(initData.workspace));
+		const extHostWorkspace = new ExtHostWorkspace(rpcProtocol, extHostLogService, withNullAsUndefined(initData.workspace));
 
-		this._extHostLogService.info('extension host started');
-		this._extHostLogService.trace('initData', initData);
+		extHostLogService.info('extension host started');
+		extHostLogService.trace('initData', initData);
 
 		const extHostConfiguraiton = new ExtHostConfiguration(rpcProtocol.getProxy(MainContext.MainThreadConfiguration), extHostWorkspace);
 		this._extensionService = new ExtHostExtensionService(
@@ -85,9 +77,8 @@ export class ExtensionHostMain {
 			extHostWorkspace,
 			extHostConfiguraiton,
 			initData.environment,
-			this._extHostLogService,
-			schemeTransformer,
-			outputChannelName
+			extHostLogService,
+			uriTransformer
 		);
 
 		// error forwarding and stack trace scanning
@@ -131,7 +122,7 @@ export class ExtensionHostMain {
 		}
 		this._isTerminating = true;
 
-		this.disposables = dispose(this.disposables);
+		this._disposables.dispose();
 
 		errors.setUnexpectedErrorHandler((err) => {
 			// TODO: write to log once we have one
@@ -145,7 +136,7 @@ export class ExtensionHostMain {
 		}, 1000);
 	}
 
-	private transform(initData: IInitData, rpcProtocol: RPCProtocol): IInitData {
+	private static _transform(initData: IInitData, rpcProtocol: RPCProtocol): IInitData {
 		initData.extensions.forEach((ext) => (<any>ext).extensionLocation = URI.revive(rpcProtocol.transformIncomingURIs(ext.extensionLocation)));
 		initData.environment.appRoot = URI.revive(rpcProtocol.transformIncomingURIs(initData.environment.appRoot));
 		initData.environment.appSettingsHome = URI.revive(rpcProtocol.transformIncomingURIs(initData.environment.appSettingsHome));
