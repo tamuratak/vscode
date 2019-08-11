@@ -41,7 +41,7 @@ export class ExtHostEditorInsets implements ExtHostEditorInsetsShape {
 		this._disposables.dispose();
 	}
 
-	createWebviewEditorInset(editor: vscode.TextEditor, line: number, height: number, options: vscode.WebviewOptions | undefined, extension: IExtensionDescription): vscode.WebviewEditorInset {
+	createWebviewEditorInset(editor: vscode.TextEditor, line: number, height: number, options: vscode.WebviewOptions | undefined, extension: IExtensionDescription) {
 
 		let apiEditor: ExtHostTextEditor | undefined;
 		for (const candidate of this._editors.getVisibleTextEditors()) {
@@ -59,53 +59,11 @@ export class ExtHostEditorInsets implements ExtHostEditorInsetsShape {
 		const onDidReceiveMessage = new Emitter<any>();
 		const onDidDispose = new Emitter<void>();
 
-		const webview = new class implements vscode.Webview {
-
-			private readonly _uuid = generateUuid();
-			private _html: string = '';
-			private _options: vscode.WebviewOptions = Object.create(null);
-
-			toWebviewResource(resource: vscode.Uri): vscode.Uri {
-				return toWebviewResource(that._initData, this._uuid, resource);
-			}
-
-			get cspSource(): string {
-				return that._initData.webviewCspSource;
-			}
-
-			set options(value: vscode.WebviewOptions) {
-				this._options = value;
-				that._proxy.$setOptions(handle, value);
-			}
-
-			get options(): vscode.WebviewOptions {
-				return this._options;
-			}
-
-			set html(value: string) {
-				this._html = value;
-				that._proxy.$setHtml(handle, value);
-			}
-
-			get html(): string {
-				return this._html;
-			}
-
-			get onDidReceiveMessage(): vscode.Event<any> {
-				return onDidReceiveMessage.event;
-			}
-
-			postMessage(message: any): Thenable<boolean> {
-				return that._proxy.$postMessage(handle, message);
-			}
-		};
-
 		const inset = new class implements vscode.WebviewEditorInset {
 
 			readonly editor: vscode.TextEditor = editor;
 			readonly line: number = line;
 			readonly height: number = height;
-			readonly webview: vscode.Webview = webview;
 			readonly onDidDispose: vscode.Event<void> = onDidDispose.event;
 
 			dispose(): void {
@@ -118,6 +76,58 @@ export class ExtHostEditorInsets implements ExtHostEditorInsetsShape {
 					onDidDispose.dispose();
 					onDidReceiveMessage.dispose();
 				}
+			}
+
+			async createWebview(): Promise<vscode.Webview | undefined> {
+				const result = that._proxy.$createWebView(handle, options || {}, extension.identifier, extension.extensionLocation);
+				if (!result) {
+					return;
+				}
+				const webview = new class implements vscode.Webview {
+
+					private readonly _uuid = generateUuid();
+					private _html: string = '';
+					private _options: vscode.WebviewOptions = Object.create(null);
+
+					toWebviewResource(resource: vscode.Uri): vscode.Uri {
+						return toWebviewResource(that._initData, this._uuid, resource);
+					}
+
+					get cspSource(): string {
+						return that._initData.webviewCspSource;
+					}
+
+					set options(value: vscode.WebviewOptions) {
+						this._options = value;
+						that._proxy.$setOptions(handle, value);
+					}
+
+					get options(): vscode.WebviewOptions {
+						return this._options;
+					}
+
+					set html(value: string) {
+						this._html = value;
+						that._proxy.$setHtml(handle, value);
+					}
+
+					get html(): string {
+						return this._html;
+					}
+
+					get onDidReceiveMessage(): vscode.Event<any> {
+						return onDidReceiveMessage.event;
+					}
+
+					postMessage(message: any): Thenable<boolean> {
+						return that._proxy.$postMessage(handle, message);
+					}
+				};
+				return webview as vscode.Webview;
+			}
+
+			disposeWebview() {
+				that._proxy.$disposeWebview(handle);
 			}
 		};
 

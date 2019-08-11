@@ -8,7 +8,7 @@ import * as modes from 'vs/editor/common/modes';
 import { MainContext, MainThreadEditorInsetsShape, IExtHostContext, ExtHostEditorInsetsShape, ExtHostContext } from 'vs/workbench/api/common/extHost.protocol';
 import { extHostNamedCustomer } from '../common/extHostCustomers';
 import { ICodeEditorService } from 'vs/editor/browser/services/codeEditorService';
-import { IWebviewService, WebviewElement } from 'vs/workbench/contrib/webview/common/webview';
+import { IWebviewService, Webview } from 'vs/workbench/contrib/webview/common/webview';
 import { DisposableStore } from 'vs/base/common/lifecycle';
 import { IActiveCodeEditor, IViewZone } from 'vs/editor/browser/editorBrowser';
 import { ExtensionIdentifier } from 'vs/platform/extensions/common/extensions';
@@ -20,6 +20,7 @@ class EditorWebviewZone implements IViewZone {
 	readonly afterLineNumber: number;
 	readonly afterColumn: number;
 	readonly heightInLines: number;
+	webview: Webview | undefined;
 
 	private _id?: number;
 	// suppressMouseDown?: boolean | undefined;
@@ -32,8 +33,7 @@ class EditorWebviewZone implements IViewZone {
 	constructor(
 		readonly editor: IActiveCodeEditor,
 		readonly line: number,
-		readonly height: number,
-		readonly webview: WebviewElement,
+		readonly height: number
 	) {
 		this.domNode = document.createElement('div');
 		this.domNode.style.zIndex = '10'; // without this, the webview is not interactive
@@ -42,11 +42,13 @@ class EditorWebviewZone implements IViewZone {
 		this.heightInLines = height;
 
 		editor.changeViewZones(accessor => this._id = accessor.addZone(this));
-		webview.mountTo(this.domNode);
 	}
 
 	dispose(): void {
 		this.editor.changeViewZones(accessor => this._id && accessor.removeZone(this._id));
+		if (this.webview) {
+			this.webview.dispose();
+		}
 	}
 }
 
@@ -69,7 +71,7 @@ export class MainThreadEditorInsets implements MainThreadEditorInsetsShape {
 		this._disposables.dispose();
 	}
 
-	async $createEditorInset(handle: number, id: string, uri: UriComponents, line: number, height: number, options: modes.IWebviewOptions, extensionId: ExtensionIdentifier, extensionLocation: UriComponents): Promise<void> {
+	async $createEditorInset(handle: number, id: string, uri: UriComponents, line: number, height: number): Promise<void> {
 
 		let editor: IActiveCodeEditor | undefined;
 		id = id.substr(0, id.indexOf(',')); //todo@joh HACK
@@ -87,17 +89,7 @@ export class MainThreadEditorInsets implements MainThreadEditorInsetsShape {
 		}
 
 		const disposables = new DisposableStore();
-
-		const webview = this._webviewService.createWebview('' + handle, {
-			enableFindWidget: false,
-			allowSvgs: false,
-			extension: { id: extensionId, location: URI.revive(extensionLocation) }
-		}, {
-				allowScripts: options.enableScripts,
-				localResourceRoots: options.localResourceRoots ? options.localResourceRoots.map(uri => URI.revive(uri)) : undefined
-			});
-
-		const webviewZone = new EditorWebviewZone(editor, line, height, webview);
+		const webviewZone = new EditorWebviewZone(editor, line, height);
 
 		const remove = () => {
 			disposables.dispose();
@@ -108,8 +100,6 @@ export class MainThreadEditorInsets implements MainThreadEditorInsetsShape {
 		disposables.add(editor.onDidChangeModel(remove));
 		disposables.add(editor.onDidDispose(remove));
 		disposables.add(webviewZone);
-		disposables.add(webview);
-		disposables.add(webview.onMessage(msg => this._proxy.$onDidReceiveMessage(handle, msg)));
 
 		this._insets.set(handle, webviewZone);
 	}
@@ -121,19 +111,55 @@ export class MainThreadEditorInsets implements MainThreadEditorInsetsShape {
 
 	}
 
+
+	async $createWebView(handle: number, options: modes.IWebviewOptions, extensionId: ExtensionIdentifier, extensionLocation: UriComponents): Promise<boolean> {
+		const inset = this.getInset(handle);
+		if (inset.webview) {
+			return false;
+		}
+
+		const webview = this._webviewService.createWebview('' + handle, {
+			enableFindWidget: false,
+			allowSvgs: false,
+			extension: { id: extensionId, location: URI.revive(extensionLocation) }
+		}, {
+				allowScripts: options.enableScripts,
+				localResourceRoots: options.localResourceRoots ? options.localResourceRoots.map(uri => URI.revive(uri)) : undefined
+			});
+
+		inset.webview = webview;
+		webview.mountTo(inset.domNode);
+
+		return true;
+	}
+
+	$disposeWebview(handle: number): void {
+		const inset = this.getInset(handle);
+		if (inset.webview) {
+			inset.webview.dispose();
+			inset.webview = undefined;
+		}
+	}
+
 	$setHtml(handle: number, value: string): void {
 		const inset = this.getInset(handle);
-		inset.webview.html = value;
+		if (inset.webview) {
+			inset.webview.html = value;
+		}
 	}
 
 	$setOptions(handle: number, options: modes.IWebviewOptions): void {
 		const inset = this.getInset(handle);
-		inset.webview.contentOptions = options;
+		if (inset.webview) {
+			inset.webview.contentOptions = options;
+		}
 	}
 
 	async $postMessage(handle: number, value: any): Promise<boolean> {
 		const inset = this.getInset(handle);
-		inset.webview.sendMessage(value);
+		if (inset.webview) {
+			inset.webview.sendMessage(value);
+		}
 		return true;
 	}
 
