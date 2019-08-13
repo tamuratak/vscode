@@ -105,9 +105,11 @@ export class MainThreadEditorInsets implements MainThreadEditorInsetsShape {
 	}
 
 	$disposeEditorInset(handle: number): void {
-		const inset = this.getInset(handle);
-		this._insets.delete(handle);
-		inset.dispose();
+		const inset = this._insets.get(handle);
+		if (inset) {
+			this._insets.delete(handle);
+			inset.dispose();
+		}
 
 	}
 
