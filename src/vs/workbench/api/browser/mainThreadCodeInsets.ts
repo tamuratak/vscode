@@ -94,7 +94,6 @@ export class MainThreadEditorInsets implements MainThreadEditorInsetsShape {
 		const remove = () => {
 			disposables.dispose();
 			this._proxy.$onDidDispose(handle);
-			this._insets.delete(handle);
 		};
 
 		disposables.add(editor.onDidChangeModel(remove));
@@ -105,11 +104,9 @@ export class MainThreadEditorInsets implements MainThreadEditorInsetsShape {
 	}
 
 	$disposeEditorInset(handle: number): void {
-		const inset = this._insets.get(handle);
-		if (inset) {
-			this._insets.delete(handle);
-			inset.dispose();
-		}
+		const inset = this.getInset(handle);
+		this._insets.delete(handle);
+		inset.dispose();
 
 	}
 
