@@ -141,6 +141,7 @@ declare module 'vscode' {
 		readonly line: number;
 		readonly height: number;
 		readonly onDidDispose: Event<void>;
+		readonly webview: Webview | undefined;
 		dispose(): void;
 		createWebview(): Promise<Webview | undefined>;
 		disposeWebview(): void;

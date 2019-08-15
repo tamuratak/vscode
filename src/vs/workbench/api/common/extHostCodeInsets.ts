@@ -59,6 +59,7 @@ export class ExtHostEditorInsets implements ExtHostEditorInsetsShape {
 		const onDidReceiveMessage = new Emitter<any>();
 		const onDidDispose = new Emitter<void>();
 
+		let _webview: vscode.Webview | undefined = undefined;
 		const inset = new class implements vscode.WebviewEditorInset {
 
 			readonly editor: vscode.TextEditor = editor;
@@ -67,6 +68,7 @@ export class ExtHostEditorInsets implements ExtHostEditorInsetsShape {
 			readonly onDidDispose: vscode.Event<void> = onDidDispose.event;
 
 			dispose(): void {
+				_webview = undefined;
 				if (that._insets.has(handle)) {
 					that._insets.delete(handle);
 					that._proxy.$disposeEditorInset(handle);
@@ -123,10 +125,16 @@ export class ExtHostEditorInsets implements ExtHostEditorInsetsShape {
 						return that._proxy.$postMessage(handle, message);
 					}
 				};
-				return webview as vscode.Webview;
+				_webview = webview;
+				return _webview;
+			}
+
+			get webview() {
+				return _webview;
 			}
 
 			disposeWebview() {
+				_webview = undefined;
 				that._proxy.$disposeWebview(handle);
 			}
 		};
