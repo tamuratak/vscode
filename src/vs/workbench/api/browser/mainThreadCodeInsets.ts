@@ -20,7 +20,7 @@ class EditorWebviewZone implements IViewZone {
 	readonly domNode: HTMLElement;
 	readonly afterLineNumber: number;
 	readonly afterColumn: number;
-	readonly heightInLines: number;
+	heightInLines: number;
 
 	private _id?: string;
 	// suppressMouseDown?: boolean | undefined;
@@ -48,6 +48,11 @@ class EditorWebviewZone implements IViewZone {
 
 	dispose(): void {
 		this.editor.changeViewZones(accessor => this._id && accessor.removeZone(this._id));
+	}
+
+	updateHeight(height: number) {
+		this.heightInLines = height;
+		this.editor.changeViewZones(accessor => this._id && accessor.layoutZone(this._id));
 	}
 }
 
@@ -135,6 +140,11 @@ export class MainThreadEditorInsets implements MainThreadEditorInsetsShape {
 		const inset = this.getInset(handle);
 		inset.webview.sendMessage(value);
 		return true;
+	}
+
+	$updateHeight(handle: number, height: number) {
+		const inset = this.getInset(handle);
+		inset.updateHeight(height);
 	}
 
 	private getInset(handle: number): EditorWebviewZone {

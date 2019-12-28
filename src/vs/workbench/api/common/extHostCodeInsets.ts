@@ -104,9 +104,9 @@ export class ExtHostEditorInsets implements ExtHostEditorInsetsShape {
 
 			readonly editor: vscode.TextEditor = editor;
 			readonly line: number = line;
-			readonly height: number = height;
 			readonly webview: vscode.Webview = webview;
 			readonly onDidDispose: vscode.Event<void> = onDidDispose.event;
+			private _height: number = height;
 
 			dispose(): void {
 				if (that._insets.has(handle)) {
@@ -118,6 +118,14 @@ export class ExtHostEditorInsets implements ExtHostEditorInsetsShape {
 					onDidDispose.dispose();
 					onDidReceiveMessage.dispose();
 				}
+			}
+
+			get height() {
+				return this._height;
+			}
+
+			updateHeight(height: number) {
+				that._proxy.$updateHeight(handle, height);
 			}
 		};
 

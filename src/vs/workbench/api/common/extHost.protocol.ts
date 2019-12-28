@@ -535,6 +535,7 @@ export interface MainThreadEditorInsetsShape extends IDisposable {
 	$setHtml(handle: number, value: string): void;
 	$setOptions(handle: number, options: modes.IWebviewOptions): void;
 	$postMessage(handle: number, value: any): Promise<boolean>;
+	$updateHeight(handle: number, height: number): void;
 }
 
 export interface ExtHostEditorInsetsShape {

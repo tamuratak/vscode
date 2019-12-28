@@ -335,6 +335,7 @@ declare module 'vscode' {
 		readonly webview: Webview;
 		readonly onDidDispose: Event<void>;
 		dispose(): void;
+		updateHeight(height: number): void;
 	}
 
 	export namespace window {
