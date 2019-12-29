@@ -125,6 +125,7 @@ export class ExtHostEditorInsets implements ExtHostEditorInsetsShape {
 			}
 
 			updateHeight(height: number) {
+				this._height = height;
 				that._proxy.$updateHeight(handle, height);
 			}
 		};
