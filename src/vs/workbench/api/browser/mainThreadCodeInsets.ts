@@ -104,6 +104,7 @@ export class MainThreadEditorInsets implements MainThreadEditorInsetsShape {
 	}
 
 	async $createWebView(handle: number, options: modes.IWebviewOptions, extensionId: ExtensionIdentifier, extensionLocation: UriComponents): Promise<boolean> {
+		this.$disposeWebview(handle);
 		const inset = this.getInset(handle);
 		const webview = this._webviewService.createWebview('' + handle, {
 			enableFindWidget: false,
