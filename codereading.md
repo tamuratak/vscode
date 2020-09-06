@@ -268,10 +268,9 @@ workspace:///src/vs/editor/browser/widget/codeEditorWidget.ts#L218-220
 workspace:///src/vs/editor/browser/controller/ で制御している?
 
 
-### キーボードイベント
+### Code Editor のキーボードイベント
 
 以下で扱っている.
-
 
 workspace:///src/vs/editor/browser/controller/textAreaInput.ts#L102-174
 ```ts
@@ -320,6 +319,22 @@ export class TextAreaHandler extends ViewPart {
 
 	private readonly _textAreaInput: TextAreaInput; // <- ここ
 
+```
+
+最終的には以下で Code Editor の root の dom に addEventListener を呼んでいる.
+
+workspace:///src/vs/base/browser/dom.ts#L99-111
+```ts
+class DomListener implements IDisposable {
+
+    // 中略
+
+	constructor(node: EventTarget, type: string, handler: (e: any) => void, options?: boolean | AddEventListenerOptions) {
+		this._node = node;
+		this._type = type;
+		this._handler = handler;
+		this._options = (options || false);
+		this._node.addEventListener(this._type, this._handler, this._options); // <- ここ this._type が 'keydown' など
 ```
 
 
