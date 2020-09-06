@@ -13,7 +13,7 @@ main.js
 
 ↓ electron-browser プロセスで実行
 
-- workspace:///src/vs/code/electron-browser/workbench/workbench.html
+- workspace:///src/vs/code/electron-browser/workbench/workbench.html  <- 大元の表示する html
 - workspace:///src/vs/code/electron-browser/workbench/workbench.js#L39-74
 - workspace:///src/vs/workbench/workbench.desktop.main.ts#L14-18
 - workspace:///src/vs/workbench/workbench.desktop.main.ts#L45
@@ -261,3 +261,73 @@ workspace:///src/vs/editor/browser/widget/codeEditorWidget.ts#L218-220
 	protected _modelData: ModelData | null;    // <- ここ
 
 ```
+
+
+## 入力イベント
+
+workspace:///src/vs/editor/browser/controller/ で制御している?
+
+
+### キーボードイベント
+
+以下で扱っている.
+
+
+workspace:///src/vs/editor/browser/controller/textAreaInput.ts#L102-174
+```ts
+/**
+ * Writes screen reader content to the textarea and is able to analyze its input events to generate:
+ *  - onCut
+ *  - onPaste
+ *  - onType
+ *
+ * Composition events are generated for presentation purposes (composition input is reflected in onType).
+ */
+export class TextAreaInput extends Disposable {
+
+    // 中略
+
+	private _onKeyDown = this._register(new Emitter<IKeyboardEvent>());
+	public readonly onKeyDown: Event<IKeyboardEvent> = this._onKeyDown.event;
+
+    // 中略
+
+	constructor(host: ITextAreaInputHost, private textArea: FastDomNode<HTMLTextAreaElement>) {
+		super();
+		this._host = host;
+		this._textArea = this._register(new TextAreaWrapper(textArea));
+		this._asyncTriggerCut = this._register(new RunOnceScheduler(() => this._onCut.fire(), 0));
+
+		this._textAreaState = TextAreaState.EMPTY;
+		this._selectionChangeListener = null;
+		this.writeScreenReaderContent('ctor');
+
+		this._hasFocus = false;
+		this._isDoingComposition = false;
+		this._nextCommand = ReadFromTextArea.Type;
+
+		let lastKeyDown: IKeyboardEvent | null = null;
+
+		this._register(dom.addStandardDisposableListener(textArea.domNode, 'keydown', (e: IKeyboardEvent) => { // <- ここで 'keydown' イベントのリスナーを登録している
+```
+
+
+workspace:///src/vs/editor/browser/controller/textAreaHandler.ts#L59-92
+```ts
+export class TextAreaHandler extends ViewPart {
+
+	// 中略
+
+	private readonly _textAreaInput: TextAreaInput; // <- ここ
+
+```
+
+
+### registerCommand('type', ...) の謎
+
+workspace:///src/vs/editor/browser/widget/codeEditorWidget.ts#L1587-1590
+
+workspace:///src/vs/editor/browser/widget/codeEditorWidget.ts#L984-998
+
+workspace:///src/vs/editor/browser/controller/coreCommands.ts#L1872-1923
+
