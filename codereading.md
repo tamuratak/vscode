@@ -346,3 +346,8 @@ workspace:///src/vs/editor/browser/widget/codeEditorWidget.ts#L984-998
 
 workspace:///src/vs/editor/browser/controller/coreCommands.ts#L1872-1923
 
+#### extension host がブロックしている場合、UI プロセスはどこでブロックするか
+
+実際は UI プロセスがブロックすることはなくて 入力したキーが type コマンドの実行を経てドキュメントに反映されないので、
+ブロックされているように見えるだけ。
+
