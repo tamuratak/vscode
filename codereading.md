@@ -338,7 +338,9 @@ class DomListener implements IDisposable {
 ```
 
 
-### registerCommand('type', ...) の謎
+### registerCommand('type', callback) の謎
+
+キーを入力するたびに登録した callback が実行される.
 
 workspace:///src/vs/editor/browser/widget/codeEditorWidget.ts#L1587-1590
 
@@ -348,6 +350,6 @@ workspace:///src/vs/editor/browser/controller/coreCommands.ts#L1872-1923
 
 #### extension host がブロックしている場合、UI プロセスはどこでブロックするか
 
-実際は UI プロセスがブロックすることはなくて 入力したキーが type コマンドの実行を経てドキュメントに反映されないので、
-ブロックされているように見えるだけ。
+実際は UI プロセスがブロックすることはなくて 入力したキーが callback の実行を経てドキュメントに反映されるので、
+その分遅れて見えるだけ。
 
