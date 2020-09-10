@@ -353,3 +353,5 @@ workspace:///src/vs/editor/browser/controller/coreCommands.ts#L1872-1923
 実際は UI プロセスがブロックすることはなくて 入力したキーが callback の実行を経てドキュメントに反映されるので、
 その分遅れて見えるだけ。
 
+## WebView の実装
+
