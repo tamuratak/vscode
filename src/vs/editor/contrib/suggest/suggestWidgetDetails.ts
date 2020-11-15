@@ -17,6 +17,8 @@ import { Emitter, Event } from 'vs/base/common/event';
 import { ResizableHTMLElement } from 'vs/editor/contrib/suggest/resizable';
 import { IInstantiationService } from 'vs/platform/instantiation/common/instantiation';
 
+declare const ResizeObserver: any;
+
 export function canExpandCompletionItem(item: CompletionItem | undefined): boolean {
 	return !!item && Boolean(item.completion.documentation || item.completion.detail && item.completion.detail !== item.completion.label);
 }
@@ -43,6 +45,7 @@ export class SuggestDetailsWidget {
 	private readonly _renderDisposeable = new DisposableStore();
 	private _borderWidth: number = 1;
 	private _size = new dom.Dimension(330, 0);
+	private _docsClientHeight = 0;
 
 	constructor(
 		private readonly _editor: ICodeEditor,
@@ -65,7 +68,12 @@ export class SuggestDetailsWidget {
 		this._type = dom.append(this._header, dom.$('p.type'));
 
 		this._docs = dom.append(this._body, dom.$('p.docs'));
-
+		const resizeObserver = new ResizeObserver(() => {
+			this.layout(this._size.width, this._type.clientHeight + this._docs.clientHeight);
+			this._docsClientHeight = this._docs.clientHeight;
+			console.log(`height: ${this._docs.clientHeight}`);
+		});
+		resizeObserver.observe(this._docs);
 		this._configureFont();
 
 		this._disposables.add(this._editor.onDidChangeConfiguration(e => {
@@ -171,7 +179,7 @@ export class SuggestDetailsWidget {
 			this._docs.appendChild(renderedContents.element);
 			this._renderDisposeable.add(renderedContents);
 			this._renderDisposeable.add(this._markdownRenderer.onDidRenderCodeBlock(() => {
-				this.layout(this._size.width, this._type.clientHeight + this._docs.clientHeight);
+				this.layout(this._size.width, this._type.clientHeight + this._docsClientHeight);
 				this._onDidChangeContents.fire(this);
 			}));
 		}
@@ -191,7 +199,7 @@ export class SuggestDetailsWidget {
 
 		this._body.scrollTop = 0;
 
-		this.layout(this._size.width, this._type.clientHeight + this._docs.clientHeight);
+		this.layout(this._size.width, this._type.clientHeight + this._docsClientHeight);
 		this._onDidChangeContents.fire(this);
 	}
 
