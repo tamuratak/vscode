@@ -192,6 +192,11 @@ export class SuggestDetailsWidget {
 		this._body.scrollTop = 0;
 
 		this.layout(this._size.width, this._type.clientHeight + this._docs.clientHeight);
+
+		for (const elm of this._docs.getElementsByTagName('img')) {
+			elm.addEventListener('load', () => this.layout(this._size.width, this._type.clientHeight + this._docs.clientHeight));
+		}
+
 		this._onDidChangeContents.fire(this);
 	}
 
