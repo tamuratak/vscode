@@ -209,6 +209,7 @@ window.addEventListener('scroll', throttle(() => {
 	updateScrollProgress();
 
 	if (scrollDisabledCount > 0) {
+		console.log(`scrollDisabledCount: ${scrollDisabledCount}`);
 		scrollDisabledCount -= 1;
 	} else {
 		const line = getEditorLineNumberForPageOffset(window.scrollY);
