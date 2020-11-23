@@ -114,7 +114,7 @@ class MarkdownPreview extends Disposable implements WebviewResourceProvider {
 
 	private firstUpdate = true;
 	private currentVersion?: PreviewDocumentVersion;
-	private isScrolling = false;
+	private isScrollingCount = 0;
 	private _disposed: boolean = false;
 	private imageInfo: { readonly id: string, readonly width: number, readonly height: number; }[] = [];
 
@@ -250,8 +250,8 @@ class MarkdownPreview extends Disposable implements WebviewResourceProvider {
 			return;
 		}
 
-		if (this.isScrolling) {
-			this.isScrolling = false;
+		if (this.isScrollingCount > 0) {
+			this.isScrollingCount -= 1;
 			return;
 		}
 
@@ -315,7 +315,7 @@ class MarkdownPreview extends Disposable implements WebviewResourceProvider {
 				continue;
 			}
 
-			this.isScrolling = true;
+			this.isScrollingCount += 1;
 			const sourceLine = Math.floor(line);
 			const fraction = line - sourceLine;
 			const text = editor.document.lineAt(sourceLine).text;
