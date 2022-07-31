@@ -30,7 +30,17 @@ main.js
 - workspace:///src/vs/code/electron-main/main.ts
 - workspace:///src/vs/code/electron-main/app.ts#L247-261
 - workspace:///src/vs/platform/windows/electron-main/windowsMainService.ts
-- workspace:///src/vs/platform/windows/electron-main/window.ts#L280 で electron の new BrowserWindow している
+
+new BrowserWindow している
+- workspace:///src/vs/platform/windows/electron-main/window.ts#L277-281
+```ts
+
+			// Create the browser window
+			mark('code/willCreateCodeBrowserWindow');
+			this._win = new BrowserWindow(options);
+			mark('code/didCreateCodeBrowserWindow');
+```
+
 - workspace:///src/vs/platform/windows/electron-main/window.ts#L712-714
 
 ↑ electron-main プロセスで実行
@@ -564,3 +574,22 @@ workspace:///src/vs/editor/browser/controller/coreCommands.ts#L1872-1923
 その分遅れて見えるだけ。
 
 ## WebView の実装
+
+## pstree
+
+```
+ |-+= 57348 tamura /Applications/Visual Studio Code.app/Contents/MacOS/Electron
+ | |--- 57351 tamura /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper (GPU).app/Contents/MacOS/Code Helper (GPU) --type=gpu-process --disable-color-correct-rendering
+ | |--- 57353 tamura /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper.app/Contents/MacOS/Code Helper --type=utility
+ | |-+- 57363 tamura /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper (Renderer).app/Contents/MacOS/Code Helper (Renderer) --type=renderer --vscode-window-kind=shared-process
+ | | |-+- 57365 tamura /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper (Renderer).app/Contents/MacOS/Code Helper (Renderer) --type=ptyHost
+ | | | \--= 57529 tamura /bin/zsh -l
+ | | \--- 57491 tamura /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper (Renderer).app/Contents/MacOS/Code Helper (Renderer) --type=fileWatcher
+ | |--- 57489 tamura /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper (Renderer).app/Contents/MacOS/Code Helper (Renderer) --type=renderer
+ | \-+- 57490 tamura /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper.app/Contents/MacOS/Code Helper --type=extensionHost
+ |   |--- 57545 tamura /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper.app/Contents/MacOS/Code Helper /Applications/Visual Studio Code.app/Contents/Resources/app/extensions/node_modules/typescript/lib/tsserver.js
+ |   |-+- 57546 tamura /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper.app/Contents/MacOS/Code Helper --max-old-space-size=3072 /Applications/Visual Studio Code.app/Contents/Resources/app/extensions/node_modules/typescript/lib/tsserver.js
+ |   | \--- 57551 tamura /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper.app/Contents/MacOS/Code Helper /Applications/Visual Studio Code.app/Contents/Resources/app/extensions/node_modules/typescript/lib/typingsInstaller.js
+ |   \--- 57562 tamura /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper.app/Contents/MacOS/Code Helper /Applications/Visual Studio Code.app/Contents/Resources/app/extensions/json-language-features/server/dist/node/jsonServerMain
+ ```
+
