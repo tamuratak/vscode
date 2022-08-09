@@ -32,16 +32,15 @@ main.js
 - workspace:///src/vs/platform/windows/electron-main/windowsMainService.ts
 
 new BrowserWindow している
-- workspace:///src/vs/platform/windows/electron-main/window.ts#L277-281
+- workspace://0bdcc12da406/src/vs/platform/windows/electron-main/window.ts#L278-282
 ```ts
-
 			// Create the browser window
 			mark('code/willCreateCodeBrowserWindow');
 			this._win = new BrowserWindow(options);
 			mark('code/didCreateCodeBrowserWindow');
 ```
 
-- workspace:///src/vs/platform/windows/electron-main/window.ts#L712-714
+- workspace://0bdcc12da406/src/vs/platform/windows/electron-main/window.ts#L851-852
 
 ↑ electron-main プロセスで実行
 
