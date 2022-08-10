@@ -29,7 +29,7 @@ require('./bootstrap-amd').load(process.env['VSCODE_AMD_ENTRYPOINT']);
 main.js
 - workspace:///src/vs/code/electron-main/main.ts
 - workspace://1b27c830d29f/src/vs/code/electron-main/app.ts#L371-380
-- workspace:///src/vs/platform/windows/electron-main/windowsMainService.ts
+- workspace://01769e0bb156/src/vs/platform/windows/electron-main/windowsMainService.ts
 
 new BrowserWindow している
 - workspace://0bdcc12da406/src/vs/platform/windows/electron-main/window.ts#L278-282
@@ -46,24 +46,30 @@ new BrowserWindow している
 
 ↓ electron-browser プロセスで実行
 
-- workspace:///src/vs/code/electron-sandbox/workbench/workbench.html  <- 大元の表示する html
+- workspace://1b27c830d29f/src/vs/code/electron-sandbox/workbench/workbench.html  <- 大元の表示する html
 - workspace://1b27c830d29f/src/vs/code/electron-sandbox/workbench/workbench.js#L21-25
 - workspace://1b27c830d29f/src/vs/workbench/workbench.desktop.main.ts#L18
 - workspace://1b27c830d29f/src/vs/workbench/workbench.desktop.main.ts#L86
 ```ts
 import 'vs/workbench/services/extensions/electron-sandbox/sandboxExtensionService';
 ```
-- workspace:///src/vs/workbench/workbench.common.main.ts
+- workspace://1b27c830d29f/src/vs/workbench/workbench.common.main.ts
 
 ↓ extension 管理 と RPC などのサービス
-- workspace:///src/vs/workbench/services/extensions/electron-browser/extensionService.ts
+- workspace://01769e0bb156/src/vs/workbench/services/extensions/browser/extensionService.ts
 
 
 - workspace:///src/vs/workbench/workbench.desktop.main.ts#L44-46
 - workspace:///src/vs/workbench/services/extensions/electron-browser/extensionService.ts#L413-431
-- workspace:///src/vs/workbench/services/extensions/electron-browser/localProcessExtensionHost.ts#L205-206
-
-- workspace:///src/vs/platform/extensions/electron-main/extensionHostStarter.ts#L202-206
+- workspace://01769e0bb156/src/vs/workbench/services/extensions/electron-sandbox/localProcessExtensionHost.ts#L188-199
+- workspace://01769e0bb156/src/vs/workbench/services/extensions/electron-sandbox/localProcessExtensionHost.ts#L217-220
+```ts
+		const env = objects.mixin(processEnv, {
+			VSCODE_AMD_ENTRYPOINT: 'vs/workbench/api/node/extensionHostProcess',
+			VSCODE_HANDLES_UNCAUGHT_ERRORS: true
+		});
+```
+- workspace://01769e0bb156/src/vs/platform/extensions/electron-main/extensionHostStarter.ts#L202-206
 ```ts
 		this._process = fork(
 			FileAccess.asFileUri('bootstrap-fork', require).fsPath,
@@ -77,9 +83,6 @@ fork
 ↓ child process で実行. node/ ディレクトリにあるコードが相当する.
 
 - workspace:///src/vs/workbench/services/extensions/node/extensionHostProcess.ts#L1-8
-- workspace:///src/vs/workbench/services/extensions/node/extensionHostProcessSetup.ts
-
-
 
 
 ### Remote Server
