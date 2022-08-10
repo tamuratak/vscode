@@ -13,13 +13,13 @@ Electron アプリは package.json を読んで main を実行する。
 
 指定されている main は
 
-- workspace:///src/main.js#L122
+- workspace://1b27c830d29f/src/main.js#L130
 
 ### サブプロセスの起動
 
 環境変数 VSCODE_AMD_ENTRYPOINT を loader が読み込む.
 VSCODE_AMD_ENTRYPOINT を設定して bootstrap-fork.js をロードしている.
-- workspace:///src/bootstrap-fork.js#L45-46
+- workspace://1b27c830d29f/src/bootstrap-fork.js#L45-46
 ```js
 // Load AMD entry point
 require('./bootstrap-amd').load(process.env['VSCODE_AMD_ENTRYPOINT']);
@@ -28,7 +28,7 @@ require('./bootstrap-amd').load(process.env['VSCODE_AMD_ENTRYPOINT']);
 ### extensionHost の起動まで
 main.js
 - workspace:///src/vs/code/electron-main/main.ts
-- workspace:///src/vs/code/electron-main/app.ts#L247-261
+- workspace://1b27c830d29f/src/vs/code/electron-main/app.ts#L371-380
 - workspace:///src/vs/platform/windows/electron-main/windowsMainService.ts
 
 new BrowserWindow している
@@ -47,13 +47,12 @@ new BrowserWindow している
 ↓ electron-browser プロセスで実行
 
 - workspace:///src/vs/code/electron-sandbox/workbench/workbench.html  <- 大元の表示する html
-- workspace:///src/vs/code/electron-sandbox/workbench/workbench.js#L39-74
-- workspace:///src/vs/workbench/workbench.desktop.main.ts#L14-18
-- workspace:///src/vs/workbench/workbench.desktop.main.ts#L45
-```typescript
-import 'vs/workbench/services/extensions/electron-browser/extensionService'; // <- extension 管理 と RPC などのサービス
+- workspace://1b27c830d29f/src/vs/code/electron-sandbox/workbench/workbench.js#L21-25
+- workspace://1b27c830d29f/src/vs/workbench/workbench.desktop.main.ts#L18
+- workspace://1b27c830d29f/src/vs/workbench/workbench.desktop.main.ts#L86
+```ts
+import 'vs/workbench/services/extensions/electron-sandbox/sandboxExtensionService';
 ```
-- workspace:///src/vs/workbench/workbench.sandbox.main.ts#L13-17
 - workspace:///src/vs/workbench/workbench.common.main.ts
 
 ↓ extension 管理 と RPC などのサービス
