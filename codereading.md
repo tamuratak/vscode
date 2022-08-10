@@ -80,9 +80,9 @@ import 'vs/workbench/services/extensions/electron-sandbox/sandboxExtensionServic
 
 fork
 
-↓ child process で実行. node/ ディレクトリにあるコードが相当する.
+↓ child process で実行.
 
-- workspace:///src/vs/workbench/services/extensions/node/extensionHostProcess.ts#L1-8
+- workspace:///src/vs/workbench/services/extensions/node/extensionHostProcess.ts
 
 
 ### Remote Server
@@ -91,7 +91,7 @@ Remote Server の起動は以下のような流れで行われる.
 
 以下が参考になる.
 
-- workspace:///extensions/vscode-test-resolver/src/extension.ts#L115
+- workspace://73f32f26fbc0/extensions/vscode-test-resolver/src/extension.ts#L115
 ```ts
 				extHostProcess = cp.spawn(serverCommandPath, commandArgs, { env, cwd: vscodePath });
 ```
