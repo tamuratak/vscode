@@ -56,8 +56,6 @@ import 'vs/workbench/services/extensions/electron-sandbox/sandboxExtensionServic
 		return super._createExtensionHost(runningLocation, isInitialStart);
 ```
 
-↓ 実際の起動は fork を呼んでいる
-
 - workspace://01769e0bb156/src/vs/workbench/services/extensions/electron-sandbox/localProcessExtensionHost.ts#L188-199
 - workspace://01769e0bb156/src/vs/workbench/services/extensions/electron-sandbox/localProcessExtensionHost.ts#L217-220
 ```ts
@@ -66,6 +64,8 @@ import 'vs/workbench/services/extensions/electron-sandbox/sandboxExtensionServic
 			VSCODE_HANDLES_UNCAUGHT_ERRORS: true
 		});
 ```
+
+↓ 実際の起動は fork を呼んでいる
 
 - workspace://01769e0bb156/src/vs/platform/extensions/electron-main/extensionHostStarter.ts#L202-206
 ```ts
