@@ -31,7 +31,9 @@ main.js
 - workspace://1b27c830d29f/src/vs/code/electron-main/app.ts#L371-380
 - workspace://01769e0bb156/src/vs/platform/windows/electron-main/windowsMainService.ts
 
-new BrowserWindow している
+- https://www.electronjs.org/docs/latest/tutorial/process-model#window-management
+
+new BrowserWindow している. new BrowserWindow は新しい 子process を起動する.
 - workspace://0bdcc12da406/src/vs/platform/windows/electron-main/window.ts#L278-282
 ```ts
 			// Create the browser window
@@ -42,10 +44,6 @@ new BrowserWindow している
 
 - workspace://0bdcc12da406/src/vs/platform/windows/electron-main/window.ts#L851-852
 
-↑ electron-main プロセスで実行
-
-↓ electron-browser プロセスで実行
-
 - workspace://1b27c830d29f/src/vs/code/electron-sandbox/workbench/workbench.html  <- 大元の表示する html
 - workspace://1b27c830d29f/src/vs/code/electron-sandbox/workbench/workbench.js#L21-25
 - workspace://1b27c830d29f/src/vs/workbench/workbench.desktop.main.ts#L18
@@ -53,14 +51,13 @@ new BrowserWindow している
 ```ts
 import 'vs/workbench/services/extensions/electron-sandbox/sandboxExtensionService';
 ```
-- workspace://1b27c830d29f/src/vs/workbench/workbench.common.main.ts
+- workspace://472c8a9fd36b/src/vs/workbench/services/extensions/electron-sandbox/sandboxExtensionService.ts#L18
+```ts
+		return super._createExtensionHost(runningLocation, isInitialStart);
+```
 
-↓ extension 管理 と RPC などのサービス
-- workspace://01769e0bb156/src/vs/workbench/services/extensions/browser/extensionService.ts
+↓ 実際の起動は fork を呼んでいる
 
-
-- workspace:///src/vs/workbench/workbench.desktop.main.ts#L44-46
-- workspace:///src/vs/workbench/services/extensions/electron-browser/extensionService.ts#L413-431
 - workspace://01769e0bb156/src/vs/workbench/services/extensions/electron-sandbox/localProcessExtensionHost.ts#L188-199
 - workspace://01769e0bb156/src/vs/workbench/services/extensions/electron-sandbox/localProcessExtensionHost.ts#L217-220
 ```ts
@@ -69,6 +66,7 @@ import 'vs/workbench/services/extensions/electron-sandbox/sandboxExtensionServic
 			VSCODE_HANDLES_UNCAUGHT_ERRORS: true
 		});
 ```
+
 - workspace://01769e0bb156/src/vs/platform/extensions/electron-main/extensionHostStarter.ts#L202-206
 ```ts
 		this._process = fork(
@@ -83,6 +81,23 @@ fork
 ↓ child process で実行.
 
 - workspace://1677341a4a85/src/vs/workbench/api/node/extensionHostProcess.ts
+
+#### 注意
+
+一見、子プロセス(electron-sandbox/workbench/workbench.html)から extensionHostStarter.start つまり fork を起動しているように見えるが、
+RPC なので実際は main プロセスが起動している.
+
+workspace://472c8a9fd36b/src/vs/workbench/services/extensions/electron-sandbox/localProcessExtensionHost.ts#L90
+```ts
+		return this._extensionHostStarter.start(this._id, opts);
+```
+
+実際、extensionHostStarter が new されるのは main プロセスにおいてのみである。
+
+workspace://472c8a9fd36b/src/vs/code/electron-main/app.ts#L659
+```ts
+		services.set(IExtensionHostStarter, new SyncDescriptor(ExtensionHostStarter));
+```
 
 
 ### Remote Server
