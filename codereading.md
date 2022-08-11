@@ -44,7 +44,8 @@ new BrowserWindow している. new BrowserWindow は新しい 子process を起
 
 - workspace://0bdcc12da406/src/vs/platform/windows/electron-main/window.ts#L851-852
 
-- workspace://1b27c830d29f/src/vs/code/electron-sandbox/workbench/workbench.html  <- 大元の表示する html
+↓ 大元の表示する html
+- workspace://1b27c830d29f/src/vs/code/electron-sandbox/workbench/workbench.html
 - workspace://1b27c830d29f/src/vs/code/electron-sandbox/workbench/workbench.js#L21-25
 - workspace://1b27c830d29f/src/vs/workbench/workbench.desktop.main.ts#L18
 - workspace://1b27c830d29f/src/vs/workbench/workbench.desktop.main.ts#L86
@@ -66,9 +67,13 @@ import 'vs/workbench/services/extensions/electron-sandbox/sandboxExtensionServic
 ```
 
 ↓ 実際の起動は fork を呼んでいる
-
-- workspace://01769e0bb156/src/vs/platform/extensions/electron-main/extensionHostStarter.ts#L202-206
+- workspace://01769e0bb156/src/vs/platform/extensions/electron-main/extensionHostStarter.ts#L197-206
 ```ts
+	start(opts: IExtensionHostProcessOptions): void {
+		if (platform.isCI) {
+			this._logService.info(`Calling fork to start extension host...`);
+		}
+		const sw = StopWatch.create(false);
 		this._process = fork(
 			FileAccess.asFileUri('bootstrap-fork', require).fsPath,
 			['--type=extensionHost', '--skipWorkspaceStorageLock'],
@@ -76,10 +81,7 @@ import 'vs/workbench/services/extensions/electron-sandbox/sandboxExtensionServic
 		);
 ```
 
-fork
-
-↓ child process で実行.
-
+↓ fork で実行されるファイル
 - workspace://1677341a4a85/src/vs/workbench/api/node/extensionHostProcess.ts
 
 #### 注意
