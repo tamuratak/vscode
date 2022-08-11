@@ -82,7 +82,7 @@ fork
 
 ↓ child process で実行.
 
-- workspace:///src/vs/workbench/services/extensions/node/extensionHostProcess.ts
+- workspace://1677341a4a85/src/vs/workbench/api/node/extensionHostProcess.ts
 
 
 ### Remote Server
