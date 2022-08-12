@@ -250,7 +250,7 @@ Proxy の使い方： Proxy オブジェクトのプロパティは `get` が返
 以下のコードは有効であることに注意する.
 handler としてサービスオブジェクトを渡すだけで, ちゃんと実装したことになっている.
 
-workspace:///src/vs/base/parts/ipc/common/ipc.ts#L1059-1062
+- workspace://f17b33faf21f/src/vs/base/parts/ipc/common/ipc.ts#L1059-1062
 ```ts
 					const target = handler[event];
 					if (typeof target === 'function') {
@@ -259,7 +259,7 @@ workspace:///src/vs/base/parts/ipc/common/ipc.ts#L1059-1062
 ```
 
 
-- workspace:///src/vs/base/parts/ipc/common/ipc.ts#L1126-1145
+- workspace://f17b33faf21f/src/vs/base/parts/ipc/common/ipc.ts#L1126-1145
 ```ts
 					// Function
 					return async function (...args: any[]) {
@@ -284,10 +284,10 @@ workspace:///src/vs/base/parts/ipc/common/ipc.ts#L1059-1062
 ```
 
 Proxy 経由のメソッドの名前には先頭に $ を付ける.
-- workspace:///src/vs/workbench/api/common/extHost.protocol.ts
+- workspace://dbbf24add846/src/vs/workbench/api/common/extHost.protocol.ts
 
 electron-browser プロセスでは fork が返した port を使って extension host と通信する.  _createExtensionHostCustomers で各サービスに登録している
-- workspace:///src/vs/workbench/services/extensions/common/extensionHostManager.ts#L174-212
+- workspace://0945ef6e358d/src/vs/workbench/services/extensions/common/extensionHostManager.ts#L261-327
 
 
 ### 実装詳細
