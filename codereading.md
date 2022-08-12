@@ -86,8 +86,9 @@ import 'vs/workbench/services/extensions/electron-sandbox/sandboxExtensionServic
 
 #### 注意
 
-一見、子プロセス(electron-sandbox/workbench/workbench.html)から extensionHostStarter.start つまり fork を起動しているように見えるが、
-RPC なので実際は main プロセスが起動している.
+一見、main プロセスの子プロセスである renderer プロセス(electron-sandbox/workbench/workbench.html)から
+extensionHostStarter.start つまり fork を呼び出しているように見えるが、
+RPC なので実際は main プロセスが fork を呼んでいる.
 
 workspace://472c8a9fd36b/src/vs/workbench/services/extensions/electron-sandbox/localProcessExtensionHost.ts#L90
 ```ts
