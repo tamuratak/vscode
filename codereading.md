@@ -225,13 +225,13 @@ workspace:///src/vs/base/parts/ipc/common/ipc.ts#L1102
 IChannel, IServerChannel と IMessagePassingProtocol がある. IChannel, IServerChannelはセット.
 引数の serialize が必要な場合は, 後者を使う? 拡張機能関連は主に後者を使う.
 IChannel, IServerChannel が使われている率は割と少ない.
-- workspace:///src/vs/base/parts/ipc/common/ipc.ts
+- workspace://f17b33faf21f/src/vs/base/parts/ipc/common/ipc.ts
 
 IChannel, IServerChannel は ProxyChannel.fromService か Server.registerChannel 経由で使われる. target の id は文字列. 異なるプロセス間での
 id の共有は、文字列の同一性により保証される. channelName と呼ばれている.
 
 IMessagePassingProtocol は RPCProtocol 経由で使われる. getProxy が色んな所で呼ばれている.
-- workspace:///src/vs/workbench/services/extensions/common/rpcProtocol.ts
+- workspace://e8415cbb16ca/src/vs/workbench/services/extensions/common/rpcProtocol.ts
 
 RPC の id は getProxy の引数(のプロパティ)が id である. 異なるプロセス間での RPC の id の共有は
 id 生成のコードが同一であるということで保証している.  src/vs/workbench/api/common/extHost.protocol.ts の createProxyIdentifier の呼び出しが同一なら id も同一.
