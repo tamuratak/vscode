@@ -318,11 +318,11 @@ function listenForMessagePort() {
 socket を作成して, それを使って protocol を作成.
 - workspace:///src/vs/workbench/services/extensions/node/extensionHostProcessSetup.ts#L115-142
 
-protocol は ExtensionHostMain が保持.
-- workspace:///src/vs/workbench/services/extensions/node/extensionHostProcessSetup.ts#L326-331
+protocol を ExtensionHostMain の constructor に渡す
+- workspace://fbb7f4188e35/src/vs/workbench/api/node/extensionHostProcess.ts#L400-405
 
-ExtensionHostMain の constructor で, RPC service に protocol をセットしている.
-- workspace:///src/vs/workbench/services/extensions/common/extensionHostMain.ts#L40-58
+ExtensionHostMain の constructor で, RPC service に protocol を渡している.
+- workspace://49394cc44d1d/src/vs/workbench/api/common/extensionHostMain.ts#L33-48
 
 extension host 用の各種サービスを起動. 各サービスは vs/workbench/api/common/extHostXXX というファイル名で実装されている.
 - workspace:///src/vs/workbench/api/common/extHost.common.services.ts#L5
