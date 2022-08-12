@@ -154,18 +154,18 @@ DI コンテナの使われ方を追えば、アプリケーションの全体�
 DI コンテナ自体を生成している === main 関数 なので。
 
 DI コンテナの interface
-workspace:///src/vs/platform/instantiation/common/instantiation.ts#L47
+- workspace://d75f7e938962/src/vs/platform/instantiation/common/instantiation.ts#L47-67
 
 
 DI コンテナの実装
-workspace:///src/vs/platform/instantiation/common/instantiationService.ts#L23
+- workspace://d75f7e938962/src/vs/platform/instantiation/common/instantiationService.ts#L23-267
 
 DI コンテナの生成
-- workspace:///src/vs/code/electron-browser/sharedProcess/sharedProcessMain.ts#L362
-- workspace:///src/vs/code/electron-main/main.ts#L218
-- workspace:///src/vs/code/node/cliProcessMain.ts#L222
-- workspace:///src/vs/editor/standalone/browser/standaloneServices.ts#L1005
-- workspace:///src/vs/server/node/remoteExtensionHostAgentCli.ts#L118
+- workspace://d75f7e938962/src/vs/code/electron-browser/sharedProcess/sharedProcessMain.ts#L363
+- workspace://d75f7e938962/src/vs/code/electron-main/main.ts#L218
+- workspace://d75f7e938962/src/vs/code/node/cliProcessMain.ts#L223
+- workspace://d75f7e938962/src/vs/editor/standalone/browser/standaloneServices.ts#L1005
+- workspace://d75f7e938962/src/vs/server/node/remoteExtensionHostAgentCli.ts#L118
 - workspace:///src/vs/server/node/serverServices.ts#L171
 - workspace:///src/vs/workbench/api/common/extensionHostMain.ts#L60
 - workspace:///src/vs/workbench/browser/workbench.ts#L202
