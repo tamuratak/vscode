@@ -3,7 +3,8 @@
 
 - VS Code Remote
 - VS Code on Web
-- 拡張機能の扱い方
+- 拡張機能の扱い方 拡張機能はAPI呼び出しがどう言う流れで実行されるか
+- WebView
 
 ## 起動プロセス
 
@@ -166,7 +167,7 @@ DI コンテナの生成
 - workspace://d75f7e938962/src/vs/code/node/cliProcessMain.ts#L223
 - workspace://d75f7e938962/src/vs/editor/standalone/browser/standaloneServices.ts#L1005
 - workspace://d75f7e938962/src/vs/server/node/remoteExtensionHostAgentCli.ts#L118
-- workspace://d75f7e938962/src/vs/server/node/serverServices.ts#L171
+- workspace://d75f7e938962/src/vs/server/node/serverServices.ts#L172
 - workspace://d75f7e938962/src/vs/workbench/api/common/extensionHostMain.ts#L60
 - workspace://d75f7e938962/src/vs/workbench/browser/workbench.ts#L202
 
