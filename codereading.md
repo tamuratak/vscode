@@ -294,7 +294,7 @@ electron-browser プロセスでは fork が返した port を使って extensio
 
 `global.vscodePorts` に fork が返した port が保存される.
 
-workspace:///src/bootstrap-fork.js#L240-251
+- workspace://f9acb97f3c75/src/bootstrap-fork.js#L240-251
 ```js
 function listenForMessagePort() {
 	// We need to listen for the 'port' event as soon as possible,
