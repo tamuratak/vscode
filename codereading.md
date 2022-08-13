@@ -313,10 +313,35 @@ function listenForMessagePort() {
 
 ### 実装詳細 その2
 
-↓ extension host 側のセットアップ
+↓ RPC 関連の extension host 側のセットアップ
 
-socket を作成して, それを使って protocol を作成.
-- workspace:///src/vs/workbench/services/extensions/node/extensionHostProcessSetup.ts#L115-142
+socket を作成するか, global.vscodePorts を使うかして protocol を作成.
+- workspace://fbb7f4188e35/src/vs/workbench/api/node/extensionHostProcess.ts#L113
+```ts
+function _createExtHostProtocol(): Promise<IMessagePassingProtocol> {
+```
+- workspace://fbb7f4188e35/src/vs/workbench/api/node/extensionHostProcess.ts#L135-141
+```ts
+			if ((<any>global).vscodePorts) {
+				const ports = (<any>global).vscodePorts;
+				delete (<any>global).vscodePorts;
+				withPorts(ports);
+			} else {
+				(<any>global).vscodePortsCallback = withPorts;
+			}
+```
+- workspace://fbb7f4188e35/src/vs/workbench/api/node/extensionHostProcess.ts#L216-223
+```ts
+		return new Promise<PersistentProtocol>((resolve, reject) => {
+
+			const socket = net.createConnection(pipeName, () => {
+				socket.removeListener('error', reject);
+				const protocol = new PersistentProtocol(new NodeSocket(socket, 'extHost-renderer'));
+				protocol.sendResume();
+				resolve(protocol);
+			});
+```
+
 
 protocol を ExtensionHostMain の constructor に渡す
 - workspace://fbb7f4188e35/src/vs/workbench/api/node/extensionHostProcess.ts#L400-405
