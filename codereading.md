@@ -1,6 +1,7 @@
 
 ## TODO
 
+- ファイル構成の概要をメモる
 - VS Code Remote
 - VS Code on Web
 - 拡張機能の扱い方 拡張機能はAPI呼び出しがどう言う流れで実行されるか
@@ -292,6 +293,8 @@ electron-browser プロセスでは fork が返した port を使って extensio
 
 ### 実装詳細
 
+#### プロセスの起動時
+
 `global.vscodePorts` に fork が返した port が保存される.
 
 - workspace://f9acb97f3c75/src/bootstrap-fork.js#L240-251
@@ -310,8 +313,7 @@ function listenForMessagePort() {
 }
 ```
 
-
-### 実装詳細 その2
+#### extension host 側のセットアップ
 
 ↓ RPC 関連の extension host 側のセットアップ
 
@@ -353,14 +355,14 @@ extension host 用の各種サービスを起動. 各サービスは vs/workbenc
 - workspace://dbbf24add846/src/vs/workbench/api/common/extHost.common.services.ts#L32-54
 - workspace://0de44f978617/src/vs/workbench/api/node/extHost.node.services.ts#L32-42
 
-~
 
-- workspace:///src/vs/workbench/services/extensions/node/extensionHostProcessSetup.ts#L178-211
-- workspace:///src/vs/workbench/services/extensions/node/extensionHostProcessSetup.ts#L297-335
-
+#### browser 側のセットアップ
 
 extension host に対する browser プロセス側のAPI は以下のディレクトリにあるファイルで定義されている
 - workspace:///src/vs/workbench/api/browser/
+
+
+#### 具体例
 
 例えば Code Inset では MainThreadEditorInsetsShape と ExtHostEditorInsetsShape を定義して
 - workspace:///src/vs/workbench/api/common/extHost.protocol.ts#L571-584
