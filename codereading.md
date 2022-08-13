@@ -350,8 +350,8 @@ ExtensionHostMain の constructor で, RPC service に protocol を渡してい�
 - workspace://49394cc44d1d/src/vs/workbench/api/common/extensionHostMain.ts#L33-48
 
 extension host 用の各種サービスを起動. 各サービスは vs/workbench/api/common/extHostXXX というファイル名で実装されている.
-- workspace:///src/vs/workbench/api/common/extHost.common.services.ts#L5
-- workspace:///src/vs/workbench/api/node/extHost.node.services.ts#L5
+- workspace://dbbf24add846/src/vs/workbench/api/common/extHost.common.services.ts#L32-54
+- workspace://0de44f978617/src/vs/workbench/api/node/extHost.node.services.ts#L32-42
 
 ~
 
