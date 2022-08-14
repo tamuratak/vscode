@@ -496,9 +496,6 @@ browser との通信
 			const onMessage = createScopedOnMessageEvent(id, 'vscode:message') as Event<VSBuffer>;
 ```
 
-↓ 現在はまだ使われていない
-extension host との通信. browser と extension host をつなぐパイプを作って双方に渡す.
-
 現行)
 
 workspace://f4f1b04d872a/src/vs/workbench/services/extensions/electron-sandbox/nativeLocalProcessExtensionHost.ts#L92-93
