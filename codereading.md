@@ -838,6 +838,7 @@ electron-main (Electron の main プロセス)
 node (extension host などで実行される)
 worker (Web Worker として実行される)
 
+```
 src/vs/base/
 src/vs/base/browser/
 src/vs/base/browser/dompurify/
@@ -1872,7 +1873,7 @@ src/vs/workbench/services/workspaces/
 src/vs/workbench/services/workspaces/browser/
 src/vs/workbench/services/workspaces/common/
 src/vs/workbench/services/workspaces/electron-sandbox/
-
+```
 
 ## pstree
 
