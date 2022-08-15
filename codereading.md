@@ -127,7 +127,7 @@ workspace://472c8a9fd36b/src/vs/code/electron-main/app.ts#L659
 ```
 
 
-### VS Code Remote
+## VS Code Remote
 
 VS Code Remote は起動手順は以下の通り
 
@@ -151,7 +151,7 @@ Code OSS で vscode-testresolver.newWindow を呼ぶと, 以下の VS Code Remot
 ```
 
 
-##### Code OSS での起動手順
+### Code OSS での起動手順
 
 scripts/code-server.sh を実行 -> scripts/code-server.js ->
 
