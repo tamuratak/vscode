@@ -150,6 +150,20 @@ Code OSS で vscode-testresolver.newWindow を呼ぶと, 以下の VS Code Remot
 					const r: vscode.ResolverResult = new vscode.ResolvedAuthority('127.0.0.1', port, connectionToken);
 ```
 
+workspace://a567b593d526/src/vs/workbench/services/environment/electron-sandbox/environmentService.ts#L63
+```ts
+	get remoteAuthority() { return this.configuration.remoteAuthority; }
+```
+
+workspace://a567b593d526/src/vs/workbench/electron-sandbox/desktop.main.ts#L171
+```ts
+		const environmentService = new NativeWorkbenchEnvironmentService(this.configuration, productService);
+```
+
+workspace://342394d1e7d4/src/vs/workbench/services/extensions/electron-sandbox/electronExtensionService.ts#L464
+```ts
+		const remoteAuthority = this._environmentService.remoteAuthority;
+```
 
 ### Code OSS での起動手順
 
