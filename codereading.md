@@ -5,6 +5,12 @@
 - 拡張機能の扱い方 拡張機能はAPI呼び出しがどう言う流れで実行されるか
 - WebView
 
+- workspace://b524d80d9c5e/src/vs/workbench/services/extensions/common/abstractExtensionService.ts#L863
+```ts
+			const extHostManager = this._createExtensionHostManager(location, isInitialStart, initialActivationEvents);
+```
+
+
 ## 起動プロセス
 
 Electron アプリは package.json を読んで main を実行する。
