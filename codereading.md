@@ -10,6 +10,22 @@
 			const extHostManager = this._createExtensionHostManager(location, isInitialStart, initialActivationEvents);
 ```
 
+以下の部分で _startExtensionHostsIfNecessary は _scanAndHandleExtensions 内でも呼ばれる.
+
+- workspace://b524d80d9c5e/src/vs/workbench/services/extensions/common/abstractExtensionService.ts#L753-762
+```ts
+	protected async _initialize(): Promise<void> {
+		perf.mark('code/willLoadExtensions');
+		this._startExtensionHostsIfNecessary(true, []);
+
+		const lock = await this._registryLock.acquire('_initialize');
+		try {
+			await this._scanAndHandleExtensions();
+		} finally {
+			lock.dispose();
+		}
+```
+
 
 ## 起動プロセス
 
