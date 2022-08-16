@@ -143,6 +143,10 @@ vscode-remote は authorityPrefix と呼ばれる. vscode.workspace.registerRemo
 ```ts
 		export function registerRemoteAuthorityResolver(authorityPrefix: string, resolver: RemoteAuthorityResolver): Disposable;
 ```
+workspace://0656d21d1191/extensions/vscode-test-resolver/src/extension.ts#L283
+```ts
+		return vscode.commands.executeCommand('vscode.newWindow', { remoteAuthority: 'test+test', reuseWindow: true });
+```
 
 ### vscode-test-resolver
 
