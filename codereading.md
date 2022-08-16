@@ -136,6 +136,16 @@ VS Code Remote は起動手順は以下の通り
 2. VS Code Remote 拡張が vscode.ResolvedAuthority を呼ぶ.
 3. VS Code 本体が remote server (extension host) に接続する
 
+remoteAuthority は vscode-remote+hostname のように「接続方法+ホスト名」になっている.
+vscode-remote は authorityPrefix と呼ばれる. vscode.workspace.registerRemoteAuthorityResolver に登録する.
+
+- workspace://9d0b225acf5f/src/vscode-dts/vscode.proposed.resolvers.d.ts#L210
+```ts
+		export function registerRemoteAuthorityResolver(authorityPrefix: string, resolver: RemoteAuthorityResolver): Disposable;
+```
+
+### vscode-test-resolver
+
 以下が参考になる.
 
 Code OSS で vscode-testresolver.newWindow を呼ぶと, 以下の VS Code Remote のテスト実装が実行される.
@@ -149,6 +159,8 @@ Code OSS で vscode-testresolver.newWindow を呼ぶと, 以下の VS Code Remot
 ```ts
 					const r: vscode.ResolverResult = new vscode.ResolvedAuthority('127.0.0.1', port, connectionToken);
 ```
+
+### メモ
 
 workspace://a567b593d526/src/vs/workbench/services/environment/electron-sandbox/environmentService.ts#L63
 ```ts
@@ -165,7 +177,31 @@ workspace://342394d1e7d4/src/vs/workbench/services/extensions/electron-sandbox/e
 		const remoteAuthority = this._environmentService.remoteAuthority;
 ```
 
+### 実装詳細
+
+コールスタック. ここから
+
+- workspace://4878dfa5a1b4/src/vs/workbench/api/browser/mainThreadExtensionService.ts#L202
+```ts
+		return this._actual.$resolveAuthority(remoteAuthority, resolveAttempt);
+```
+
+...
+
+- workspace://b524d80d9c5e/src/vs/workbench/services/extensions/common/abstractExtensionService.ts#L759
+```ts
+			await this._scanAndHandleExtensions();
+```
+ここまで.
+
 ### Code OSS での起動手順
+
+以下で使っている.
+
+- workspace://0656d21d1191/extensions/vscode-test-resolver/src/extension.ts#L109
+```ts
+				const serverCommand = process.platform === 'win32' ? 'code-server.bat' : 'code-server.sh';
+```
 
 scripts/code-server.sh を実行 -> scripts/code-server.js ->
 
