@@ -26,6 +26,8 @@
 		}
 ```
 
+_startExtensionHostsIfNecessary -> _createExtensionHostManager -> _createExtensionHost
+
 - workspace://342394d1e7d4/src/vs/workbench/services/extensions/electron-sandbox/electronExtensionService.ts#L236-248
 ```ts
 	protected _createExtensionHost(runningLocation: ExtensionRunningLocation, isInitialStart: boolean): IExtensionHost | null {
