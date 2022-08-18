@@ -2,6 +2,7 @@
 
 - VS Code Remote
 - VS Code on Web
+- extension host が複数ある場合は?
 - 拡張機能の扱い方 拡張機能はAPI呼び出しがどう言う流れで実行されるか
 - WebView
 
