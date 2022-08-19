@@ -6,6 +6,11 @@
 - 拡張機能の扱い方 拡張機能はAPI呼び出しがどう言う流れで実行されるか
 - WebView
 
+workspace://0945ef6e358d/src/vs/workbench/services/extensions/common/extensionHostManager.ts#L261
+```ts
+	private _createExtensionHostCustomers(protocol: IMessagePassingProtocol): IExtensionHostProxy {
+```
+
 - workspace://b524d80d9c5e/src/vs/workbench/services/extensions/common/abstractExtensionService.ts#L863
 ```ts
 			const extHostManager = this._createExtensionHostManager(location, isInitialStart, initialActivationEvents);
