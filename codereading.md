@@ -6,6 +6,13 @@
 - 拡張機能の扱い方 拡張機能はAPI呼び出しがどう言う流れで実行されるか
 - WebView
 
+
+- workspace://aa0e7b731a74/src/vs/workbench/api/common/extHost.api.impl.ts#L168
+```ts
+	const extHostEditorInsets = rpcProtocol.set(ExtHostContext.ExtHostEditorInsets, new ExtHostEditorInsets(rpcProtocol.getProxy(MainContext.MainThreadEditorInsets), extHostEditors, initData.remote));
+```
+
+
 workspace://0945ef6e358d/src/vs/workbench/services/extensions/common/extensionHostManager.ts#L261
 ```ts
 	private _createExtensionHostCustomers(protocol: IMessagePassingProtocol): IExtensionHostProxy {
