@@ -29,7 +29,7 @@
 
 _startExtensionHostsIfNecessary -> _createExtensionHostManager -> _createExtensionHost
 
-- workspace://342394d1e7d4/src/vs/workbench/services/extensions/electron-sandbox/electronExtensionService.ts#L236-248
+- workspace://342394d1e7d4/src/vs/workbench/services/extensions/electron-sandbox/electronExtensionService.ts#L236-255
 ```ts
 	protected _createExtensionHost(runningLocation: ExtensionRunningLocation, isInitialStart: boolean): IExtensionHost | null {
 		switch (runningLocation.kind) {
@@ -44,7 +44,15 @@ _startExtensionHostsIfNecessary -> _createExtensionHostManager -> _createExtensi
 			}
 			case ExtensionHostKind.Remote: {
 				const remoteAgentConnection = this._remoteAgentService.getConnection();
+				if (remoteAgentConnection) {
+					return this._instantiationService.createInstance(RemoteExtensionHost, runningLocation, this._createRemoteExtensionHostDataProvider(remoteAgentConnection.remoteAuthority), this._remoteAgentService.socketFactory);
+				}
+				return null;
+			}
+		}
+	}
 ```
+
 
 
 ## 起動プロセス
