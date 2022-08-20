@@ -12,6 +12,7 @@
 	const extHostEditorInsets = rpcProtocol.set(ExtHostContext.ExtHostEditorInsets, new ExtHostEditorInsets(rpcProtocol.getProxy(MainContext.MainThreadEditorInsets), extHostEditors, initData.remote));
 ```
 
+↓このメソッドで RPC 呼び出し先を設定している はず
 
 workspace://0945ef6e358d/src/vs/workbench/services/extensions/common/extensionHostManager.ts#L261
 ```ts
