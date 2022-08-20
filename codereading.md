@@ -5,6 +5,7 @@
 - extension host が複数ある場合は? rederer プロセスのリクエストはどの host にとばされるのか?
 - 拡張機能の扱い方 拡張機能はAPI呼び出しがどう言う流れで実行されるか
 - WebView
+- api.impl.ts は extension host 側で実行される
 
 
 - workspace://aa0e7b731a74/src/vs/workbench/api/common/extHost.api.impl.ts#L168
@@ -12,12 +13,22 @@
 	const extHostEditorInsets = rpcProtocol.set(ExtHostContext.ExtHostEditorInsets, new ExtHostEditorInsets(rpcProtocol.getProxy(MainContext.MainThreadEditorInsets), extHostEditors, initData.remote));
 ```
 
-↓このメソッドで RPC 呼び出し先を設定している はず
+↓このメソッドで RPC 呼び出し先を設定している はず. renderer プロセスで実行される.
 
 workspace://0945ef6e358d/src/vs/workbench/services/extensions/common/extensionHostManager.ts#L261
 ```ts
 	private _createExtensionHostCustomers(protocol: IMessagePassingProtocol): IExtensionHostProxy {
 ```
+
+しかし,
+
+workspace://0945ef6e358d/src/vs/workbench/services/extensions/common/extensionHostManager.ts#L297
+```ts
+				const instance = this._instantiationService.createInstance(ctor, extHostContext);
+```
+
+
+
 
 - workspace://b524d80d9c5e/src/vs/workbench/services/extensions/common/abstractExtensionService.ts#L863
 ```ts
