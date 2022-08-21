@@ -19,11 +19,18 @@ main
   + pty などいろいろ
 
 プロセス内でユニークなオブジェクトは DI を使って生成される.
-ユニークなオブジェクトと 動的なオブジェクトを混ぜて引数にして新たにオブジェクトを生成することもできる.
-createInstanceメソッド を使う.
+ユニークなオブジェクトと動的なオブジェクトを混ぜて引数にして新たにオブジェクトを生成することもできる.
+createInstance メソッドを使う.
 
 extension host との通信. rennderer プロセスから起動して extension host との port などを引数にして createInstance で
 サービスオブジェクトを生成.
+
+browser: ブラウザ上の renderer 用のコード
+electron-sandbox: electron の renderer プロセス用のコード
+electron-main: electron の main プロセス用のコード
+common: 共通で使われるコード
+node: extension host, shared process などのコード
+worker: extension host, shared process などの worker 実装のコード
 
 ## 一時的メモ
 
