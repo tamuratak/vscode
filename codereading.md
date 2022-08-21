@@ -8,6 +8,25 @@
 - api.impl.ts は extension host 側で実行される
 
 
+## 全体のアーキテクチャ
+
+複数のプロセスを起動する. pstree で確認. プロセス間通信の方法は改修中なので流動的.
+
+main
++ renderer プロセス
++ extension host
++ shared プロセス
+  + pty などいろいろ
+
+プロセス内でユニークなオブジェクトは DI を使って生成される.
+ユニークなオブジェクトと 動的なオブジェクトを混ぜて引数にして新たにオブジェクトを生成することもできる.
+createInstanceメソッド を使う.
+
+extension host との通信. rennderer プロセスから起動して extension host との port などを引数にして createInstance で
+サービスオブジェクトを生成.
+
+## 一時的メモ
+
 - workspace://aa0e7b731a74/src/vs/workbench/api/common/extHost.api.impl.ts#L168
 ```ts
 	const extHostEditorInsets = rpcProtocol.set(ExtHostContext.ExtHostEditorInsets, new ExtHostEditorInsets(rpcProtocol.getProxy(MainContext.MainThreadEditorInsets), extHostEditors, initData.remote));
@@ -26,8 +45,6 @@ workspace://0945ef6e358d/src/vs/workbench/services/extensions/common/extensionHo
 ```ts
 				const instance = this._instantiationService.createInstance(ctor, extHostContext);
 ```
-
-
 
 
 - workspace://b524d80d9c5e/src/vs/workbench/services/extensions/common/abstractExtensionService.ts#L863
