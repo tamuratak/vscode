@@ -19,6 +19,7 @@ main
   + pty などいろいろ
 
 依存するサービスが静的に決定されるプロセス内でユニークなオブジェクトは  DI コンテナーが生成のすべてを管理する.
+registerSingleton を呼んで登録する.
 
 例
 - workspace://6770e54beaad/src/vs/workbench/services/editor/browser/codeEditorService.ts#L19-25
@@ -34,6 +35,14 @@ export class CodeEditorService extends AbstractCodeEditorService {
 
 依存するオブジェクトやサービスが動的に決定する場合には, createInstance メソッドを使う.
 生成したオブジェクトをサービスとして扱う場合には, どこかにサービスとして登録する.
+rpcProtocol に登録する
+
+- workspace://0945ef6e358d/src/vs/workbench/services/extensions/common/extensionHostManager.ts#L299
+```ts
+				this._rpcProtocol.set(id, instance);
+```
+
+
 
 extension host との通信. rennderer プロセスから起動して extension host との port などを引数にして createInstance で
 サービスオブジェクトを生成.
@@ -46,6 +55,19 @@ node: extension host, shared process などのコード
 worker: extension host, shared process などの worker 実装のコード
 
 ## 一時的メモ
+
+
+- workspace://be5af93ef66c/src/vs/workbench/electron-sandbox/desktop.main.ts#L148-155
+```ts
+		// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		//
+		// NOTE: Please do NOT register services here. Use `registerSingleton()`
+		//       from `workbench.common.main.ts` if the service is shared between
+		//       desktop and web or `workbench.desktop.main.ts` if the service
+		//       is desktop only.
+		//
+		// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+```
 
 - workspace://aa0e7b731a74/src/vs/workbench/api/common/extHost.api.impl.ts#L168
 ```ts
