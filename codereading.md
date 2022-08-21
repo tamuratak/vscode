@@ -10,7 +10,7 @@
 
 ## 全体のアーキテクチャ
 
-複数のプロセスを起動する. pstree で確認. プロセス間通信の方法は改修中なので流動的.
+以下のような複数のプロセスから構成される. pstree で確認. プロセス間通信の方法は改修中なので流動的.
 
 main
 + renderer プロセス
@@ -18,10 +18,14 @@ main
 + shared プロセス
   + pty などいろいろ
 
-依存するサービスが静的に決定されるプロセス内でユニークなオブジェクトは  DI コンテナーが生成のすべてを管理する.
-registerSingleton を呼んで登録する.
+依存するサービスが静的に決定されるプロセス内でユニークなオブジェクトは DI コンテナーが生成のすべてを管理する.
+registerSingleton を呼んで登録する. 以下がサービス登録用のインデックス.
 
-例
+- workspace://ca824e6c1458/src/vs/workbench/workbench.desktop.main.ts
+- workspace://3e8a8ee109e2/src/vs/workbench/workbench.web.main.ts
+
+サービスのコンストラクタの例.
+
 - workspace://6770e54beaad/src/vs/workbench/services/editor/browser/codeEditorService.ts#L19-25
 ```ts
 export class CodeEditorService extends AbstractCodeEditorService {
