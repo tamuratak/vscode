@@ -18,9 +18,22 @@ main
 + shared プロセス
   + pty などいろいろ
 
-プロセス内でユニークなオブジェクトは DI を使って生成される.
-ユニークなオブジェクトと動的なオブジェクトを混ぜて引数にして新たにオブジェクトを生成することもできる.
-createInstance メソッドを使う.
+依存するサービスが静的に決定されるプロセス内でユニークなオブジェクトは  DI コンテナーが生成のすべてを管理する.
+
+例
+- workspace://6770e54beaad/src/vs/workbench/services/editor/browser/codeEditorService.ts#L19-25
+```ts
+export class CodeEditorService extends AbstractCodeEditorService {
+
+	constructor(
+		@IEditorService private readonly editorService: IEditorService,
+		@IThemeService themeService: IThemeService,
+		@IConfigurationService private readonly configurationService: IConfigurationService,
+	) {
+```
+
+依存するオブジェクトやサービスが動的に決定する場合には, createInstance メソッドを使う.
+生成したオブジェクトをサービスとして扱う場合には, どこかにサービスとして登録する.
 
 extension host との通信. rennderer プロセスから起動して extension host との port などを引数にして createInstance で
 サービスオブジェクトを生成.
