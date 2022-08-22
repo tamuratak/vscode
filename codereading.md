@@ -1,5 +1,6 @@
 ## TODO
 
+- 一時的メモの整理
 - VS Code Remote
 - VS Code on Web
 - extension host が複数ある場合は? rederer プロセスのリクエストはどの host にとばされるのか?
