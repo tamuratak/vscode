@@ -49,15 +49,22 @@ export class CodeEditorService extends AbstractCodeEditorService {
 
 依存するオブジェクトやサービスが動的に決定する場合には, createInstance メソッドを使う.
 
+プロセス間の通信には以下のどちらかを使う. extensionHost との通信には RPCProtocol を使う.
 
-rpcProtocol に登録する
+- workspace://f17b33faf21f/src/vs/base/parts/ipc/common/ipc.ts
+- workspace://e8415cbb16ca/src/vs/workbench/services/extensions/common/rpcProtocol.ts
+
+RPCProtocol に id を登録することで, 異なるプロセスからのリクエストを受け付けるようになる.
+異なるプロセス間での RPC の id の共有は, id 生成のコードが同一であるということで保証している.
+- workspace://fa4ff1519d9d/src/vs/workbench/api/common/extHost.protocol.ts#L2261-2375
+の createProxyIdentifier の呼び出しが同一なら id も同一.
+
+RPCProtocol への id の登録は以下のところで行っている.
 
 - workspace://0945ef6e358d/src/vs/workbench/services/extensions/common/extensionHostManager.ts#L299
 ```ts
 				this._rpcProtocol.set(id, instance);
 ```
-
-
 
 extension host との通信. rennderer プロセスから起動して extension host との port などを引数にして createInstance で
 サービスオブジェクトを生成.
