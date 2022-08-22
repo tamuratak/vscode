@@ -77,16 +77,12 @@ RPCProtocol 経由で extensionHost から呼び出される.
 
 呼び出し側
 
-workspace://13a80e03e259/src/vs/workbench/api/common/extHostCodeInsets.ts#L122
+- workspace://13a80e03e259/src/vs/workbench/api/common/extHostCodeInsets.ts#L122
 ```ts
 		this._proxy.$createEditorInset(handle, apiEditor.id, apiEditor.value.document.uri, line + 1, height, options || {}, extension.identifier, extension.extensionLocation);
 ```
 
-
 名前の先頭に ExHost がついている場合は, extensionHost で実行されるコードであることを意味する.
-
-extension host との通信. rennderer プロセスから起動して extension host との port などを引数にして createInstance で
-サービスオブジェクトを生成.
 
 browser: ブラウザ上の renderer 用のコード
 electron-sandbox: electron の renderer プロセス用のコード
@@ -97,6 +93,8 @@ worker: extension host, shared process などの worker 実装のコード
 
 ## 一時的メモ
 
+extension host との通信. rennderer プロセスから起動して extension host との port などを引数にして createInstance で
+サービスオブジェクトを生成.
 
 - workspace://be5af93ef66c/src/vs/workbench/electron-sandbox/desktop.main.ts#L148-155
 ```ts
