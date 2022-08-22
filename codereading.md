@@ -18,8 +18,14 @@ main
 + shared プロセス
   + pty などいろいろ
 
-依存するサービスが静的に決定されるプロセス内でユニークなオブジェクトは DI コンテナーが生成のすべてを管理する.
-registerSingleton を呼んで登録する. 以下がサービス登録用のインデックス.
+依存するサービスが静的に決定されるプロセス内でユニークなオブジェクトは DI コンテナが生成のすべてを管理する.
+registerSingleton などを呼んで登録する. DI コンテナの起動は、
+1. 最初に必要なサービスを手動で生成して,
+2. それらを引数にして new InstantiationService を呼んで,
+3. registerSingleton などで登録しておいたサービスを生成する.
+という手順. registerSingleton を使うのは extensionHost と renderer プロセス.
+
+以下は renderer プロセスのサービス登録用のインデックス.
 
 - workspace://ca824e6c1458/src/vs/workbench/workbench.desktop.main.ts
 - workspace://3e8a8ee109e2/src/vs/workbench/workbench.web.main.ts
@@ -38,7 +44,8 @@ export class CodeEditorService extends AbstractCodeEditorService {
 ```
 
 依存するオブジェクトやサービスが動的に決定する場合には, createInstance メソッドを使う.
-生成したオブジェクトをサービスとして扱う場合には, どこかにサービスとして登録する.
+
+
 rpcProtocol に登録する
 
 - workspace://0945ef6e358d/src/vs/workbench/services/extensions/common/extensionHostManager.ts#L299
