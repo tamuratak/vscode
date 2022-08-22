@@ -49,7 +49,7 @@ export class CodeEditorService extends AbstractCodeEditorService {
 
 依存するオブジェクトやサービスが動的に決定する場合には, createInstance メソッドを使う.
 
-プロセス間の通信には以下のどちらかを使う. extensionHost との通信には RPCProtocol を使う.
+プロセス間の通信には以下の IPC, RPCProtocol のどちらかを使う. extensionHost との通信には RPCProtocol を使う.
 
 - workspace://f17b33faf21f/src/vs/base/parts/ipc/common/ipc.ts
 - workspace://e8415cbb16ca/src/vs/workbench/services/extensions/common/rpcProtocol.ts
