@@ -66,13 +66,22 @@ RPCProtocol への id の登録は以下のところで行っている.
 				this._rpcProtocol.set(id, instance);
 ```
 
-RPCを内部で呼ぶメソッドの名前には先頭に$をつける規則になっている.
+RPC経由で呼ぶメソッドの名前には先頭に$をつける規則になっている.
+例えば, 以下の $createEditorInset はコードは renderer プロセスで実行されるが,
+RPCProtocol 経由で extensionHost から呼び出される.
 
-例
 - workspace://fbbcdc941145/src/vs/workbench/api/browser/mainThreadCodeInsets.ts#L73
 ```ts
 	async $createEditorInset(handle: number, id: string, uri: UriComponents, line: number, height: number, options: IWebviewContentOptions, extensionId: ExtensionIdentifier, extensionLocation: UriComponents): Promise<void> {
 ```
+
+呼び出し側
+
+workspace://13a80e03e259/src/vs/workbench/api/common/extHostCodeInsets.ts#L122
+```ts
+		this._proxy.$createEditorInset(handle, apiEditor.id, apiEditor.value.document.uri, line + 1, height, options || {}, extension.identifier, extension.extensionLocation);
+```
+
 
 名前の先頭に ExHost がついている場合は, extensionHost で実行されるコードであることを意味する.
 
