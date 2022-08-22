@@ -435,7 +435,7 @@ DI コンテナの生成
 - workspace://d75f7e938962/src/vs/workbench/browser/workbench.ts#L202
 
 
-### createChild が面白い
+### createChild が面白い?
 
 workspace://d75f7e938962/src/vs/platform/instantiation/common/instantiationService.ts#L39
 ```ts
