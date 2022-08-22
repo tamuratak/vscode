@@ -1042,6 +1042,18 @@ workspace:///src/vs/editor/browser/controller/coreCommands.ts#L1872-1923
 
 ## WebView の実装
 
+## Terminal の実装
+
+node-pty を使っている.
+
+- https://github.com/microsoft/node-pty
+
+### 参考
+
+- PTY を使ってシェルの入出力を好きなようにする https://note.hibariya.org/articles/20150628/pty.html
+- Terminalの基礎とRuby、そしてcursesについて - Part1 https://logmi.jp/tech/articles/321318
+
+
 ## ファイル構成
 
 browser (Electron の renderer プロセスと browser で実行される)
