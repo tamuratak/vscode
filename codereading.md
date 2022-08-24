@@ -1052,7 +1052,8 @@ node-pty を使っている.
 
 - PTY を使ってシェルの入出力を好きなようにする https://note.hibariya.org/articles/20150628/pty.html
 - Terminalの基礎とRuby、そしてcursesについて - Part1 https://logmi.jp/tech/articles/321318
-
+- https://dev.to/napicella/linux-terminals-tty-pty-and-shell-192e
+- https://dev.to/napicella/linux-terminals-tty-pty-and-shell-part-2-2cb2
 
 ## ファイル構成
 
