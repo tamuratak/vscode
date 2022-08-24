@@ -1054,6 +1054,7 @@ node-pty を使っている.
 - Terminalの基礎とRuby、そしてcursesについて - Part1 https://logmi.jp/tech/articles/321318
 - https://dev.to/napicella/linux-terminals-tty-pty-and-shell-192e
 - https://dev.to/napicella/linux-terminals-tty-pty-and-shell-part-2-2cb2
+- https://man7.org/linux/man-pages/man7/pty.7.html
 
 ## ファイル構成
 
