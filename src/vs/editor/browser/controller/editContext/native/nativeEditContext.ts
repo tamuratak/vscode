@@ -13,7 +13,6 @@ import { IClipboardService } from '../../../../../platform/clipboard/common/clip
 import { IInstantiationService } from '../../../../../platform/instantiation/common/instantiation.js';
 import { EditorOption } from '../../../../common/config/editorOptions.js';
 import { CursorState } from '../../../../common/cursorCommon.js';
-import { CursorChangeReason } from '../../../../common/cursorEvents.js';
 import { EndOfLinePreference, IModelDeltaDecoration } from '../../../../common/model.js';
 import { ViewConfigurationChangedEvent, ViewCursorStateChangedEvent } from '../../../../common/viewEvents.js';
 import { ViewContext } from '../../../../common/viewModel/viewContext.js';
@@ -237,9 +236,10 @@ export class NativeEditContext extends AbstractEditContext {
 			const positionColumn = cursorPosition.column;
 			return new Selection(positionLineNumber, positionColumn + leftDeltaOffsetOfPrimaryCursor, positionLineNumber, positionColumn + rightDeltaOffsetOfPrimaryCursor);
 		});
+		console.log(`getCursorStates(): ${JSON.stringify(this._context.viewModel.getCursorStates(), null, 2)}`);
 		const newCursorStates = newSelections.map(selection => CursorState.fromModelSelection(selection));
-		this._context.viewModel.setCursorStates('editContext', CursorChangeReason.Explicit, newCursorStates);
-		console.log(JSON.stringify(newCursorStates, null, 2));
+		//		this._context.viewModel.setCursorStates('editContext', CursorChangeReason.Explicit, newCursorStates);
+		console.log(`setCursorStates(): ${JSON.stringify(newCursorStates, null, 2)}`);
 	}
 
 	private _getNewEditContextState(): { text: string; selectionStartOffset: number; selectionEndOffset: number; textStartPositionWithinEditor: Position } {
