@@ -228,6 +228,7 @@ export class NativeEditContext extends AbstractEditContext {
 	}
 
 	private _updateCursorStatesAfterType(primaryPositionOffset: number, desiredSelectionStartOffset: number, desiredSelectionEndOffset: number): void {
+		console.log(JSON.stringify({ primaryPositionOffset, desiredSelectionStartOffset, desiredSelectionEndOffset }, null, 2));
 		const leftDeltaOffsetOfPrimaryCursor = desiredSelectionStartOffset - primaryPositionOffset;
 		const rightDeltaOffsetOfPrimaryCursor = desiredSelectionEndOffset - primaryPositionOffset;
 		const cursorPositions = this._context.viewModel.getCursorStates().map(cursorState => cursorState.modelState.position);
@@ -238,6 +239,7 @@ export class NativeEditContext extends AbstractEditContext {
 		});
 		const newCursorStates = newSelections.map(selection => CursorState.fromModelSelection(selection));
 		this._context.viewModel.setCursorStates('editContext', CursorChangeReason.Explicit, newCursorStates);
+		console.log(JSON.stringify(newCursorStates, null, 2));
 	}
 
 	private _getNewEditContextState(): { text: string; selectionStartOffset: number; selectionEndOffset: number; textStartPositionWithinEditor: Position } {

@@ -587,6 +587,7 @@ export class CursorsController extends Disposable {
 			return;
 		}
 		this._executeEdit(() => {
+			console.log(`compositionType: ${JSON.stringify({ text, replacePrevCharCnt, replaceNextCharCnt, positionDelta, source, selections: this.getSelections() }, null, 2)}`);
 			this._executeEditOperation(TypeOperations.compositionType(this._prevEditOperationType, this.context.cursorConfig, this._model, this.getSelections(), text, replacePrevCharCnt, replaceNextCharCnt, positionDelta));
 		}, eventsCollector, source);
 	}
