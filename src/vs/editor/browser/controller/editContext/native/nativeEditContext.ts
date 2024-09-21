@@ -27,7 +27,6 @@ import { Position } from '../../../../common/core/position.js';
 import { IVisibleRangeProvider } from '../textArea/textAreaEditContext.js';
 import { PositionOffsetTransformer } from '../../../../common/core/positionToOffset.js';
 import { OffsetRange } from '../../../../common/core/offsetRange.js';
-// import { DebugEditContext } from './debugEditContext.js';
 
 export class NativeEditContext extends AbstractEditContext {
 
@@ -192,15 +191,15 @@ export class NativeEditContext extends AbstractEditContext {
 		const { updateRangeStart, updateRangeEnd, selectionStart, selectionEnd } = e;
 		console.log('----------');
 		console.log('startColumn', JSON.stringify(this._context.viewModel.getCursorStates()?.[0].viewState.selection.startColumn, null, 2));
-		const startColumn = this._context.viewModel.getCursorStates()?.[0].viewState.selection.startColumn;
+		const cursorStart = this._context.viewModel.getCursorStates()?.[0].viewState.selection.startColumn - 1;
 		console.log('offsets', JSON.stringify({ previousSelectionStartOffset, previousSelectionEndOffset, e: { updateRangeStart, updateRangeEnd, selectionStart, selectionEnd } }, null, 2));
 		let replaceNextCharCnt = 0;
 		let replacePrevCharCnt = 0;
 		if (e.updateRangeEnd > previousSelectionEndOffset) {
 			replaceNextCharCnt = e.updateRangeEnd - previousSelectionEndOffset;
 		}
-		if (e.updateRangeStart < startColumn) {
-			replacePrevCharCnt = startColumn - e.updateRangeStart - 1;
+		if (e.updateRangeStart < cursorStart) {
+			replacePrevCharCnt = cursorStart - e.updateRangeStart;
 		}
 		let text = '';
 		if (previousSelectionStartOffset < e.updateRangeStart) {
