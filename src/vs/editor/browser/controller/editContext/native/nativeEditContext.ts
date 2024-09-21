@@ -188,14 +188,14 @@ export class NativeEditContext extends AbstractEditContext {
 
 		const previousSelectionStartOffset = this._previousEditContextSelection.start;
 		const previousSelectionEndOffset = this._previousEditContextSelection.endExclusive;
-
+		const cursorStart = this._context.viewModel.getCursorStates()?.[0].viewState.selection.startColumn - 1;
 		let replaceNextCharCnt = 0;
 		let replacePrevCharCnt = 0;
 		if (e.updateRangeEnd > previousSelectionEndOffset) {
 			replaceNextCharCnt = e.updateRangeEnd - previousSelectionEndOffset;
 		}
-		if (e.updateRangeStart < previousSelectionStartOffset) {
-			replacePrevCharCnt = previousSelectionStartOffset - e.updateRangeStart;
+		if (e.updateRangeStart < cursorStart) {
+			replacePrevCharCnt = cursorStart - e.updateRangeStart;
 		}
 		let text = '';
 		if (previousSelectionStartOffset < e.updateRangeStart) {
