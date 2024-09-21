@@ -27,6 +27,7 @@ import { Position } from '../../../../common/core/position.js';
 import { IVisibleRangeProvider } from '../textArea/textAreaEditContext.js';
 import { PositionOffsetTransformer } from '../../../../common/core/positionToOffset.js';
 import { OffsetRange } from '../../../../common/core/offsetRange.js';
+// import { DebugEditContext } from './debugEditContext.js';
 
 export class NativeEditContext extends AbstractEditContext {
 
@@ -188,14 +189,18 @@ export class NativeEditContext extends AbstractEditContext {
 
 		const previousSelectionStartOffset = this._previousEditContextSelection.start;
 		const previousSelectionEndOffset = this._previousEditContextSelection.endExclusive;
-
+		const { updateRangeStart, updateRangeEnd, selectionStart, selectionEnd } = e;
+		console.log('----------');
+		console.log('startColumn', JSON.stringify(this._context.viewModel.getCursorStates()?.[0].viewState.selection.startColumn, null, 2));
+		const startColumn = this._context.viewModel.getCursorStates()?.[0].viewState.selection.startColumn;
+		console.log('offsets', JSON.stringify({ previousSelectionStartOffset, previousSelectionEndOffset, e: { updateRangeStart, updateRangeEnd, selectionStart, selectionEnd } }, null, 2));
 		let replaceNextCharCnt = 0;
 		let replacePrevCharCnt = 0;
 		if (e.updateRangeEnd > previousSelectionEndOffset) {
 			replaceNextCharCnt = e.updateRangeEnd - previousSelectionEndOffset;
 		}
-		if (e.updateRangeStart < previousSelectionStartOffset) {
-			replacePrevCharCnt = previousSelectionStartOffset - e.updateRangeStart;
+		if (e.updateRangeStart < startColumn) {
+			replacePrevCharCnt = startColumn - e.updateRangeStart - 1;
 		}
 		let text = '';
 		if (previousSelectionStartOffset < e.updateRangeStart) {
@@ -205,6 +210,7 @@ export class NativeEditContext extends AbstractEditContext {
 		if (previousSelectionEndOffset > e.updateRangeEnd) {
 			text += this._editContext.text.substring(e.updateRangeEnd, previousSelectionEndOffset);
 		}
+		console.log('_emitTypeEvent', JSON.stringify({ text, replacePrevCharCnt, replaceNextCharCnt }, null, 2));
 		const typeInput: ITypeData = {
 			text,
 			replacePrevCharCnt,
