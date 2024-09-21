@@ -5,7 +5,7 @@
 
 import './nativeEditContext.css';
 import { isFirefox } from '../../../../../base/browser/browser.js';
-import { addDisposableListener } from '../../../../../base/browser/dom.js';
+import { addDisposableListener, getActiveWindow } from '../../../../../base/browser/dom.js';
 import { FastDomNode } from '../../../../../base/browser/fastDomNode.js';
 import { StandardKeyboardEvent } from '../../../../../base/browser/keyboardEvent.js';
 import { KeyCode } from '../../../../../base/common/keyCodes.js';
@@ -31,6 +31,8 @@ import { OffsetRange } from '../../../../common/core/offsetRange.js';
 export class NativeEditContext extends AbstractEditContext {
 
 	public readonly domNode: FastDomNode<HTMLDivElement>;
+	private readonly selDomNode = new FastDomNode(document.createElement('div'));
+
 	private readonly _editContext: EditContext;
 	private readonly _screenReaderSupport: ScreenReaderSupport;
 	// Store previous edit context selection so can access it when selection changes on typing
@@ -54,6 +56,7 @@ export class NativeEditContext extends AbstractEditContext {
 	) {
 		super(context);
 
+		this.setupCursorDiv();
 		this.domNode = new FastDomNode(document.createElement('div'));
 		this.domNode.setClassName(`native-edit-context`);
 		this._updateDomAttributes();
@@ -90,11 +93,16 @@ export class NativeEditContext extends AbstractEditContext {
 
 		// Edit context events
 		this._register(editContextAddDisposableListener(this._editContext, 'textformatupdate', (e) => this._handleTextFormatUpdate(e)));
-		this._register(editContextAddDisposableListener(this._editContext, 'characterboundsupdate', (e) => this._updateCharacterBounds(e)));
+		this._register(editContextAddDisposableListener(this._editContext, 'characterboundsupdate', (e) => {
+			this.updateCursorDiv();
+			this._updateCharacterBounds(e);
+		}));
 		this._register(editContextAddDisposableListener(this._editContext, 'textupdate', (e) => {
+			this.updateCursorDiv();
 			this._emitTypeEvent(viewController, e);
 		}));
 		this._register(editContextAddDisposableListener(this._editContext, 'compositionstart', (e) => {
+			this.showCursorDiv();
 			// Utlimately fires onDidCompositionStart() on the editor to notify for example suggest model of composition state
 			// Updates the composition state of the cursor controller which determines behavior of typing with interceptors
 			viewController.compositionStart();
@@ -102,6 +110,7 @@ export class NativeEditContext extends AbstractEditContext {
 			this._context.viewModel.onCompositionStart();
 		}));
 		this._register(editContextAddDisposableListener(this._editContext, 'compositionend', (e) => {
+			this.hideCursorDiv();
 			// Utlimately fires compositionEnd() on the editor to notify for example suggest model of composition state
 			// Updates the composition state of the cursor controller which determines behavior of typing with interceptors
 			viewController.compositionEnd();
@@ -110,6 +119,58 @@ export class NativeEditContext extends AbstractEditContext {
 		}));
 	}
 
+	private setupCursorDiv() {
+		const ret = this.selDomNode.domNode;
+		ret.className = 'debug-rect-selection';
+		ret.style.position = 'absolute';
+		ret.style.zIndex = '999999999';
+		ret.style.border = '1px solid blue';
+		ret.style.width = '0px';
+		ret.style.pointerEvents = 'none';
+		const win = getActiveWindow();
+		win.document.body.appendChild(ret);
+	}
+
+	private updateCursorDiv() {
+		if (!this._parent) {
+			return;
+		}
+		if (this._editContext.selectionStart !== this._editContext.selectionEnd) {
+			this.hideCursorDiv();
+			return;
+		}
+		this.showCursorDiv();
+		const options = this._context.configuration.options;
+		const lineHeight = options.get(EditorOption.lineHeight);
+		const contentLeft = options.get(EditorOption.layoutInfo).contentLeft;
+		const parentBounds = this._parent.getBoundingClientRect();
+		const verticalOffsetStart = this._context.viewLayout.getVerticalOffsetForLineNumber(this._primarySelection.startLineNumber);
+		const editorScrollTop = this._context.viewLayout.getCurrentScrollTop();
+
+		const top = parentBounds.top + verticalOffsetStart - editorScrollTop;
+		const height = (this._primarySelection.endLineNumber - this._primarySelection.startLineNumber + 1) * lineHeight;
+		let left = parentBounds.left + contentLeft;
+
+		const col = this._editContext.selectionStart + 1;
+		const line = this._primarySelection.startLineNumber;
+		const pos = new Position(line, col);
+		const linesVisibleRanges = this._visibleRangeProvider.visibleRangeForPosition(pos);
+		if (linesVisibleRanges) {
+			left += linesVisibleRanges.left;
+		}
+
+		this.selDomNode.domNode.style.top = `${top}px`;
+		this.selDomNode.domNode.style.left = `${left}px`;
+		this.selDomNode.domNode.style.height = `${height}px`;
+	}
+
+	private showCursorDiv() {
+		this.selDomNode.domNode.style.display = 'block';
+	}
+
+	private hideCursorDiv() {
+		this.selDomNode.domNode.style.display = 'none';
+	}
 	// --- Public methods ---
 
 	public override dispose(): void {
@@ -188,14 +249,18 @@ export class NativeEditContext extends AbstractEditContext {
 
 		const previousSelectionStartOffset = this._previousEditContextSelection.start;
 		const previousSelectionEndOffset = this._previousEditContextSelection.endExclusive;
-
+		const { updateRangeStart, updateRangeEnd, selectionStart, selectionEnd } = e;
+		console.log('----------');
+		console.log('startColumn', JSON.stringify(this._context.viewModel.getCursorStates()?.[0].viewState.selection.startColumn, null, 2));
+		const cursorStart = this._context.viewModel.getCursorStates()?.[0].viewState.selection.startColumn - 1;
+		console.log('offsets', JSON.stringify({ previousSelectionStartOffset, previousSelectionEndOffset, e: { updateRangeStart, updateRangeEnd, selectionStart, selectionEnd } }, null, 2));
 		let replaceNextCharCnt = 0;
 		let replacePrevCharCnt = 0;
 		if (e.updateRangeEnd > previousSelectionEndOffset) {
 			replaceNextCharCnt = e.updateRangeEnd - previousSelectionEndOffset;
 		}
-		if (e.updateRangeStart < previousSelectionStartOffset) {
-			replacePrevCharCnt = previousSelectionStartOffset - e.updateRangeStart;
+		if (e.updateRangeStart < cursorStart) {
+			replacePrevCharCnt = cursorStart - e.updateRangeStart;
 		}
 		let text = '';
 		if (previousSelectionStartOffset < e.updateRangeStart) {
@@ -205,6 +270,7 @@ export class NativeEditContext extends AbstractEditContext {
 		if (previousSelectionEndOffset > e.updateRangeEnd) {
 			text += this._editContext.text.substring(e.updateRangeEnd, previousSelectionEndOffset);
 		}
+		console.log('_emitTypeEvent', JSON.stringify({ text, replacePrevCharCnt, replaceNextCharCnt }, null, 2));
 		const typeInput: ITypeData = {
 			text,
 			replacePrevCharCnt,
