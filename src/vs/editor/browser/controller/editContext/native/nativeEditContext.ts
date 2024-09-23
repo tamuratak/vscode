@@ -249,11 +249,7 @@ export class NativeEditContext extends AbstractEditContext {
 
 		const previousSelectionStartOffset = this._previousEditContextSelection.start;
 		const previousSelectionEndOffset = this._previousEditContextSelection.endExclusive;
-		const { updateRangeStart, updateRangeEnd, selectionStart, selectionEnd } = e;
-		console.log('----------');
-		console.log('startColumn', JSON.stringify(this._context.viewModel.getCursorStates()?.[0].viewState.selection.startColumn, null, 2));
 		const cursorStart = this._context.viewModel.getCursorStates()?.[0].viewState.selection.startColumn - 1;
-		console.log('offsets', JSON.stringify({ previousSelectionStartOffset, previousSelectionEndOffset, e: { updateRangeStart, updateRangeEnd, selectionStart, selectionEnd } }, null, 2));
 		let replaceNextCharCnt = 0;
 		let replacePrevCharCnt = 0;
 		if (e.updateRangeEnd > previousSelectionEndOffset) {
@@ -270,7 +266,6 @@ export class NativeEditContext extends AbstractEditContext {
 		if (previousSelectionEndOffset > e.updateRangeEnd) {
 			text += this._editContext.text.substring(e.updateRangeEnd, previousSelectionEndOffset);
 		}
-		console.log('_emitTypeEvent', JSON.stringify({ text, replacePrevCharCnt, replaceNextCharCnt }, null, 2));
 		const typeInput: ITypeData = {
 			text,
 			replacePrevCharCnt,
