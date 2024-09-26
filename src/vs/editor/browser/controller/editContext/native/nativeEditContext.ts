@@ -83,7 +83,8 @@ export class NativeEditContext extends AbstractEditContext {
 		this._register(addDisposableListener(this.domNode.domNode, 'keydown', async (e) => {
 
 			const standardKeyboardEvent = new StandardKeyboardEvent(e);
-
+			const { keyCode, code } = standardKeyboardEvent;
+			console.log('standardKeyboardEvent', JSON.stringify({ keyCode, code }, null, 2));
 			// When the IME is visible, the keys, like arrow-left and arrow-right, should be used to navigate in the IME, and should not be propagated further
 			if (standardKeyboardEvent.keyCode === KeyCode.KEY_IN_COMPOSITION) {
 				standardKeyboardEvent.stopPropagation();
@@ -98,11 +99,18 @@ export class NativeEditContext extends AbstractEditContext {
 
 		// Edit context events
 		this._register(editContextAddDisposableListener(this._editContext, 'textformatupdate', (e) => this._handleTextFormatUpdate(e)));
-		this._register(editContextAddDisposableListener(this._editContext, 'characterboundsupdate', (e) => this._updateCharacterBounds(e)));
+		this._register(editContextAddDisposableListener(this._editContext, 'characterboundsupdate', (e) => {
+			const { rangeStart, rangeEnd } = e;
+			console.log('characterboundsupdate', JSON.stringify({ rangeStart, rangeEnd }, null, 2));
+			this._updateCharacterBounds(e);
+		}));
 		this._register(editContextAddDisposableListener(this._editContext, 'textupdate', (e) => {
+			const { text, updateRangeStart, updateRangeEnd, selectionStart, selectionEnd } = e;
+			console.log('textupdate', JSON.stringify({ text, updateRangeStart, updateRangeEnd, selectionStart, selectionEnd }, null, 2));
 			this._emitTypeEvent(viewController, e);
 		}));
 		this._register(editContextAddDisposableListener(this._editContext, 'compositionstart', (e) => {
+			console.log('compositionstart');
 			// Utlimately fires onDidCompositionStart() on the editor to notify for example suggest model of composition state
 			// Updates the composition state of the cursor controller which determines behavior of typing with interceptors
 			viewController.compositionStart();
@@ -110,6 +118,7 @@ export class NativeEditContext extends AbstractEditContext {
 			this._context.viewModel.onCompositionStart();
 		}));
 		this._register(editContextAddDisposableListener(this._editContext, 'compositionend', (e) => {
+			console.log('compositionend');
 			// Utlimately fires compositionEnd() on the editor to notify for example suggest model of composition state
 			// Updates the composition state of the cursor controller which determines behavior of typing with interceptors
 			viewController.compositionEnd();
@@ -178,6 +187,7 @@ export class NativeEditContext extends AbstractEditContext {
 
 	private _updateEditContext(): void {
 		const editContextState = this._getNewEditContextState();
+		console.log('editContextState', JSON.stringify(editContextState, null, 2));
 		this._editContext.updateText(0, Number.MAX_SAFE_INTEGER, editContextState.text);
 		this._editContext.updateSelection(editContextState.selectionStartOffset, editContextState.selectionEndOffset);
 		this._textStartPositionWithinEditor = editContextState.textStartPositionWithinEditor;
@@ -216,6 +226,7 @@ export class NativeEditContext extends AbstractEditContext {
 			replaceNextCharCnt,
 			positionDelta: 0,
 		};
+		console.log('typeInput', JSON.stringify(typeInput, null, 2));
 		this._onType(viewController, typeInput);
 
 		// It could be that the typed letter does not produce a change in the editor text,
