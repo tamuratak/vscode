@@ -190,6 +190,7 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 	private _currentLayoutWidth: number = 0;
 	private _isVisible = true;
 	private _onDidChangeVisibility = this._register(new Emitter<boolean>());
+	private _firstRender = true;
 
 	/**
 	 * Tool invocations get their own so that the ChatViewModel doesn't overwrite it.
@@ -907,11 +908,20 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 		element.currentRenderedHeight = newHeight;
 		if (fireEvent) {
 			const disposable = templateData.elementDisposables.add(dom.scheduleAtNextAnimationFrame(dom.getWindow(templateData.value), () => {
-				// Have to recompute the height here because codeblock rendering is currently async and it may have changed.
-				// If it becomes properly sync, then this could be removed.
-				element.currentRenderedHeight = templateData.rowContainer.offsetHeight;
-				disposable.dispose();
-				this._onDidChangeItemHeight.fire({ element, height: element.currentRenderedHeight });
+				const cb = () => {
+					// Have to recompute the height here because codeblock rendering is currently async and it may have changed.
+					// If it becomes properly sync, then this could be removed.
+					element.currentRenderedHeight = templateData.rowContainer.offsetHeight;
+					disposable.dispose();
+					this._onDidChangeItemHeight.fire({ element, height: element.currentRenderedHeight });
+				};
+				if (this._firstRender) {
+					// Delay the height update on first render
+					setTimeout(cb, 100);
+					this._firstRender = false;
+				} else {
+					cb();
+				}
 			}));
 		}
 	}
