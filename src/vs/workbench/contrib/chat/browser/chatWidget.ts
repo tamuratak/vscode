@@ -169,6 +169,7 @@ const supportsAllAttachments: Required<IChatAgentAttachmentCapabilities> = {
 };
 
 const DISCLAIMER = localize('chatDisclaimer', "AI responses may be inaccurate.");
+const SAVED_SESSION_BUG_REPRO_DELAY_MS = 64;
 
 export class ChatWidget extends Disposable implements IChatWidget {
 
@@ -283,6 +284,9 @@ export class ChatWidget extends Disposable implements IChatWidget {
 	private _isLoadingPromptDescriptions = false;
 
 	private _mostRecentlyFocusedItemIndex: number = -1;
+	private _savedSessionDelayToken = 0;
+	private _scheduledSavedSessionDelayToken = 0;
+	private _scrollToEndAfterDelay = false;
 
 	private readonly viewModelDisposables = this._register(new DisposableStore());
 	private _viewModel: ChatViewModel | undefined;
@@ -777,6 +781,7 @@ export class ChatWidget extends Disposable implements IChatWidget {
 
 	async clear(): Promise<void> {
 		this.logService.debug('ChatWidget#clear');
+		this._resetSavedSessionDelayState();
 		if (this._dynamicMessageLayoutData) {
 			this._dynamicMessageLayoutData.enabled = true;
 		}
@@ -800,6 +805,44 @@ export class ChatWidget extends Disposable implements IChatWidget {
 	}
 
 	private onDidChangeItems(skipDynamicLayout?: boolean) {
+		if (this._savedSessionDelayToken > 0) {
+			this._scheduleSavedSessionDelayedUpdate(skipDynamicLayout);
+			return;
+		}
+		this._performOnDidChangeItems(skipDynamicLayout);
+	}
+
+	private _scheduleSavedSessionDelayedUpdate(skipDynamicLayout?: boolean): void {
+		if (this._savedSessionDelayToken === 0 || this._scheduledSavedSessionDelayToken === this._savedSessionDelayToken) {
+			return;
+		}
+		const token = this._savedSessionDelayToken;
+		this._scheduledSavedSessionDelayToken = token;
+		void this._runSavedSessionDelayedUpdate(skipDynamicLayout, token);
+	}
+
+	private async _runSavedSessionDelayedUpdate(skipDynamicLayout: boolean | undefined, token: number): Promise<void> {
+		await this._sleepForSavedSessionRace();
+		if (token !== this._savedSessionDelayToken) {
+			this._scheduledSavedSessionDelayToken = 0;
+			return;
+		}
+		this._savedSessionDelayToken = 0;
+		this._scheduledSavedSessionDelayToken = 0;
+		this._performOnDidChangeItems(skipDynamicLayout);
+		if (this._scrollToEndAfterDelay) {
+			this._scrollToEndAfterDelay = false;
+			if (this.visible) {
+				this.scrollToEnd();
+			}
+		}
+	}
+
+	private async _sleepForSavedSessionRace(): Promise<void> {
+		await new Promise<void>(resolve => setTimeout(resolve, SAVED_SESSION_BUG_REPRO_DELAY_MS));
+	}
+
+	private _performOnDidChangeItems(skipDynamicLayout?: boolean): void {
 		if (this._visible || !this.viewModel) {
 			const treeItems = (this.viewModel?.getItems() ?? [])
 				.map((item): ITreeElement<ChatTreeItem> => {
@@ -855,6 +898,21 @@ export class ChatWidget extends Disposable implements IChatWidget {
 
 			this.renderFollowups();
 		}
+	}
+
+	private _resetSavedSessionDelayState(): void {
+		this._savedSessionDelayToken = 0;
+		this._scheduledSavedSessionDelayToken = 0;
+		this._scrollToEndAfterDelay = false;
+	}
+
+	private _prepareSavedSessionDelayState(): void {
+		this._savedSessionDelayToken = this._savedSessionDelayToken + 1;
+		if (this._savedSessionDelayToken === 0) {
+			this._savedSessionDelayToken = 1;
+		}
+		this._scheduledSavedSessionDelayToken = 0;
+		this._scrollToEndAfterDelay = true;
 	}
 
 	/**
@@ -1967,6 +2025,7 @@ export class ChatWidget extends Disposable implements IChatWidget {
 		}
 
 		if (!model) {
+			this._resetSavedSessionDelayState();
 			this.viewModel = undefined;
 			this.onDidChangeItems();
 			return;
@@ -1982,6 +2041,12 @@ export class ChatWidget extends Disposable implements IChatWidget {
 
 		this.container.setAttribute('data-session-id', model.sessionId);
 		this.viewModel = this.instantiationService.createInstance(ChatViewModel, model, this._codeBlockModelCollection);
+		const shouldDelaySavedSession = model.sessionResource.scheme === Schemas.vscodeLocalChatSession && model.getRequests().length > 0;
+		if (shouldDelaySavedSession) {
+			this._prepareSavedSessionDelayState();
+		} else {
+			this._resetSavedSessionDelayState();
+		}
 
 		// Pass input model reference to input part for state syncing
 		this.inputPart.setInputModel(model.inputModel);
@@ -2066,7 +2131,9 @@ export class ChatWidget extends Disposable implements IChatWidget {
 
 		if (this.tree && this.visible) {
 			this.onDidChangeItems();
-			this.scrollToEnd();
+			if (!this._scrollToEndAfterDelay) {
+				this.scrollToEnd();
+			}
 		}
 
 		this.renderer.updateViewModel(this.viewModel);
