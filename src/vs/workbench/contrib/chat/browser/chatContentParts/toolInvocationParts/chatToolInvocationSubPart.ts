@@ -34,6 +34,9 @@ export abstract class BaseChatToolInvocationSubPart extends Disposable {
 		super();
 	}
 
+	public layout(_width: number): void {
+	}
+
 	protected getIcon() {
 		const toolInvocation = this.toolInvocation;
 		const confirmState = IChatToolInvocation.executionConfirmedOrDenied(toolInvocation);

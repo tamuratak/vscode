@@ -166,4 +166,8 @@ export class ChatToolInvocationPart extends Disposable implements IChatContentPa
 	addDisposable(disposable: IDisposable): void {
 		this._register(disposable);
 	}
+
+	public layout(width: number): void {
+		this.subPart?.layout(width);
+	}
 }

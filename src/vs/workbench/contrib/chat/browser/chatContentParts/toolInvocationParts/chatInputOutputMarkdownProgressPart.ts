@@ -34,6 +34,8 @@ export class ChatInputOutputMarkdownProgressPart extends BaseChatToolInvocationS
 		return this._codeblocks;
 	}
 
+	private readonly _collapsibleInputOutputPart: ChatCollapsibleInputOutputContentPart;
+
 	constructor(
 		toolInvocation: IChatToolInvocation | IChatToolInvocationSerialized,
 		context: IChatContentPartRenderContext,
@@ -128,6 +130,7 @@ export class ChatInputOutputMarkdownProgressPart extends BaseChatToolInvocationS
 			isError,
 			ChatInputOutputMarkdownProgressPart._expandedByDefault.get(toolInvocation) ?? false,
 		));
+		this._collapsibleInputOutputPart = collapsibleListPart;
 		this._codeblocks.push(...collapsibleListPart.codeblocks);
 		this._register(collapsibleListPart.onDidChangeHeight(() => this._onDidChangeHeight.fire()));
 		this._register(toDisposable(() => ChatInputOutputMarkdownProgressPart._expandedByDefault.set(toolInvocation, collapsibleListPart.expanded)));
@@ -147,6 +150,10 @@ export class ChatInputOutputMarkdownProgressPart extends BaseChatToolInvocationS
 		}
 
 		this.domNode = collapsibleListPart.domNode;
+	}
+
+	public override layout(width: number): void {
+		this._collapsibleInputOutputPart.layout(width);
 	}
 
 	private getAutoApproveMessageContent() {

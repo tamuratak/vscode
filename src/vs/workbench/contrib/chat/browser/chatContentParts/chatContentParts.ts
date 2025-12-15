@@ -27,7 +27,9 @@ export interface IChatContentPart extends IDisposable {
 	 * Returns false if a rerender is needed.
 	 * followingContent is all the content that will be rendered after this content part (to support progress messages' behavior).
 	 */
-	hasSameContent(other: IChatRendererContent, followingContent: IChatRendererContent[], element: ChatTreeItem): boolean;
+	hasSameContent(other: IChatRendererContent, followingContent: ReadonlyArray<IChatRendererContent>, element: ChatTreeItem): boolean;
+
+	layout?(width: number): void;
 
 	addDisposable?(disposable: IDisposable): void;
 }

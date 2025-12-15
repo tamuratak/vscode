@@ -188,6 +188,8 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 	private readonly _treePool: TreePool;
 	private readonly _contentReferencesListPool: CollapsibleListPool;
 
+	private readonly _templates = new Set<IChatListItemTemplate>();
+
 	private _currentLayoutWidth: number = 0;
 	private _isVisible = true;
 	private _onDidChangeVisibility = this._register(new Emitter<boolean>());
@@ -342,6 +344,15 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 			}
 			for (const diffEditor of this._diffEditorPool.inUse()) {
 				diffEditor.layout(this._currentLayoutWidth);
+			}
+			for (const template of this._templates) {
+				const renderedParts = template.renderedParts;
+				if (!renderedParts) {
+					continue;
+				}
+				for (const part of renderedParts) {
+					part.layout?.(this._currentLayoutWidth);
+				}
 			}
 		}
 	}
@@ -510,6 +521,7 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 				this._onDidFocusOutside.fire();
 			}
 		}));
+		this._templates.add(template);
 		return template;
 	}
 
@@ -1547,6 +1559,7 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 			this.updateItemHeight(templateData);
 		}));
 		this.handleRenderedCodeblocks(context.element, part, codeBlockStartIndex);
+		part.layout?.(this._currentLayoutWidth);
 
 		// handling for when we want to put tool invocations inside a thinking part
 		const collapsedToolsMode = this.configService.getValue<CollapsedToolsDisplayMode>('chat.agent.thinking.collapsedTools');
@@ -1777,6 +1790,7 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 	}
 
 	disposeTemplate(templateData: IChatListItemTemplate): void {
+		this._templates.delete(templateData);
 		templateData.templateDisposables.dispose();
 	}
 
