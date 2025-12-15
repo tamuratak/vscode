@@ -1559,7 +1559,6 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 			this.updateItemHeight(templateData);
 		}));
 		this.handleRenderedCodeblocks(context.element, part, codeBlockStartIndex);
-		part.layout?.(this._currentLayoutWidth);
 
 		// handling for when we want to put tool invocations inside a thinking part
 		const collapsedToolsMode = this.configService.getValue<CollapsedToolsDisplayMode>('chat.agent.thinking.collapsedTools');

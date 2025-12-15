@@ -23,7 +23,6 @@ import { CancellationToken } from '../../../../../base/common/cancellation.js';
 import { IChatMarkdownAnchorService } from './chatMarkdownAnchorService.js';
 import { ChatMessageRole, ILanguageModelsService } from '../../common/languageModels.js';
 import { ExtensionIdentifier } from '../../../../../platform/extensions/common/extensions.js';
-import { toDisposable } from '../../../../../base/common/lifecycle.js';
 import './media/chatThinkingContent.css';
 
 
@@ -438,7 +437,6 @@ export class ChatThinkingContentPart extends ChatCollapsibleContentPart implemen
 		this.wrapper.appendChild(content);
 		if (part) {
 			this._subParts.add(part);
-			this._register(toDisposable(() => this._subParts.delete(part)));
 		}
 		if (toolInvocationId) {
 			this.toolInvocationCount++;
