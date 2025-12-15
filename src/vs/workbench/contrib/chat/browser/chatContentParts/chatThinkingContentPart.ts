@@ -24,6 +24,7 @@ import { IChatMarkdownAnchorService } from './chatMarkdownAnchorService.js';
 import { ChatMessageRole, ILanguageModelsService } from '../../common/languageModels.js';
 import { ExtensionIdentifier } from '../../../../../platform/extensions/common/extensions.js';
 import './media/chatThinkingContent.css';
+import { toDisposable } from '../../../../../base/common/lifecycle.js';
 
 
 function extractTextFromPart(content: IChatThinkingPart): string {
@@ -437,6 +438,7 @@ export class ChatThinkingContentPart extends ChatCollapsibleContentPart implemen
 		this.wrapper.appendChild(content);
 		if (part) {
 			this._subParts.add(part);
+			part.addDisposable?.(toDisposable(() => this._subParts.delete(part)));
 		}
 		if (toolInvocationId) {
 			this.toolInvocationCount++;
