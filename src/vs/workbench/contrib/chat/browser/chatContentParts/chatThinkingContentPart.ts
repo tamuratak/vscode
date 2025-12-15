@@ -23,6 +23,7 @@ import { CancellationToken } from '../../../../../base/common/cancellation.js';
 import { IChatMarkdownAnchorService } from './chatMarkdownAnchorService.js';
 import { ChatMessageRole, ILanguageModelsService } from '../../common/languageModels.js';
 import { ExtensionIdentifier } from '../../../../../platform/extensions/common/extensions.js';
+import { toDisposable } from '../../../../../base/common/lifecycle.js';
 import './media/chatThinkingContent.css';
 
 
@@ -39,6 +40,8 @@ function extractTitleFromThinkingContent(content: string): string | undefined {
 export class ChatThinkingContentPart extends ChatCollapsibleContentPart implements IChatContentPart {
 	public readonly codeblocks: undefined;
 	public readonly codeblocksPartId: undefined;
+
+	private readonly _subParts = new Set<IChatContentPart>();
 
 	private id: string | undefined;
 	private content: IChatThinkingPart;
@@ -431,8 +434,12 @@ export class ChatThinkingContentPart extends ChatCollapsibleContentPart implemen
 		this.updateDropdownClickability();
 	}
 
-	public appendItem(content: HTMLElement, toolInvocationId?: string, toolInvocation?: IChatToolInvocation | IChatToolInvocationSerialized): void {
+	public appendItem(content: HTMLElement, toolInvocationId?: string, toolInvocation?: IChatToolInvocation | IChatToolInvocationSerialized, part?: IChatContentPart): void {
 		this.wrapper.appendChild(content);
+		if (part) {
+			this._subParts.add(part);
+			this._register(toDisposable(() => this._subParts.delete(part)));
+		}
 		if (toolInvocationId) {
 			this.toolInvocationCount++;
 			let toolCallLabel: string;
@@ -465,6 +472,12 @@ export class ChatThinkingContentPart extends ChatCollapsibleContentPart implemen
 			this.wrapper.scrollTop = this.wrapper.scrollHeight;
 		}
 		this.updateDropdownClickability();
+	}
+
+	public layout(width: number): void {
+		for (const part of this._subParts) {
+			part.layout?.(width);
+		}
 	}
 
 	// makes a new text container. when we update, we now update this container.

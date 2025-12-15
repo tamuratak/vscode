@@ -29,6 +29,8 @@ export class ChatToolPostExecuteConfirmationPart extends AbstractToolConfirmatio
 		return this._codeblocks;
 	}
 
+	private _outputSubPart: ChatToolOutputContentSubPart | undefined;
+
 	constructor(
 		toolInvocation: IChatToolInvocation,
 		context: IChatContentPartRenderContext,
@@ -260,6 +262,7 @@ export class ChatToolPostExecuteConfirmationPart extends AbstractToolConfirmatio
 				parts,
 			));
 
+			this._outputSubPart = outputSubPart;
 			this._codeblocks.push(...outputSubPart.codeblocks);
 			this._register(outputSubPart.onDidChangeHeight(() => this._onDidChangeHeight.fire()));
 			outputSubPart.domNode.classList.add('tool-postconfirm-display');
@@ -268,5 +271,9 @@ export class ChatToolPostExecuteConfirmationPart extends AbstractToolConfirmatio
 
 		container.textContent = localize('noDisplayableResults', 'No displayable results');
 		return container;
+	}
+
+	public override layout(width: number): void {
+		this._outputSubPart?.layout(width);
 	}
 }

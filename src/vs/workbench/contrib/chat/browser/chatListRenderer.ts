@@ -333,7 +333,7 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 	}
 
 	layout(width: number): void {
-		const newWidth = width - 40; // padding
+		const newWidth = width - 70; // padding
 		if (newWidth !== this._currentLayoutWidth) {
 			this._currentLayoutWidth = newWidth;
 			for (const editor of this._editorPool.inUse()) {
@@ -1573,7 +1573,7 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 				}, context, templateData);
 
 				if (thinkingPart instanceof ChatThinkingContentPart) {
-					thinkingPart.appendItem(part?.domNode, toolInvocation.toolId, toolInvocation);
+					thinkingPart.appendItem(part?.domNode, toolInvocation.toolId, toolInvocation, part);
 					thinkingPart.addDisposable(part);
 					thinkingPart.addDisposable(thinkingPart.onDidChangeHeight(() => {
 						this.updateItemHeight(templateData);
@@ -1585,7 +1585,7 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 
 			if (this.shouldPinPart(toolInvocation, context.element)) {
 				if (lastThinking && part?.domNode && toolInvocation.presentation !== 'hidden') {
-					lastThinking.appendItem(part?.domNode, toolInvocation.toolId, toolInvocation);
+					lastThinking.appendItem(part?.domNode, toolInvocation.toolId, toolInvocation, part);
 					lastThinking.addDisposable(part);
 				}
 			} else {
