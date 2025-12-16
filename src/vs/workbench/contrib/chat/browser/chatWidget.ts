@@ -230,6 +230,9 @@ export class ChatWidget extends Disposable implements IChatWidget {
 
 	private readonly inputPartDisposable: MutableDisposable<ChatInputPart> = this._register(new MutableDisposable());
 	private readonly inlineInputPartDisposable: MutableDisposable<ChatInputPart> = this._register(new MutableDisposable());
+	private readonly scrollPauseDisposable: MutableDisposable<IDisposable> = this._register(new MutableDisposable());
+	private scrollPauseActive = false;
+	private pendingScrollToCurrentItem: IChatRequestViewModel | undefined;
 	private inputContainer!: HTMLElement;
 	private focusedInputDOM!: HTMLElement;
 	private editorOptions!: ChatEditorOptions;
@@ -1573,6 +1576,7 @@ export class ChatWidget extends Disposable implements IChatWidget {
 			this._onDidFocus.fire();
 		}));
 		this._register(this.tree.onDidScroll(() => {
+			this._setScrollPause();
 			this._onDidScroll.fire();
 
 			const isScrolledDown = this.tree.scrollTop >= this.tree.scrollHeight - this.tree.renderHeight - 2;
@@ -1752,6 +1756,11 @@ export class ChatWidget extends Disposable implements IChatWidget {
 	}
 
 	private scrollToCurrentItem(currentElement: IChatRequestViewModel): void {
+		if (this.scrollPauseActive) {
+			this.pendingScrollToCurrentItem = currentElement;
+			return;
+		}
+		this.pendingScrollToCurrentItem = undefined;
 		if (this.viewModel?.editing && currentElement) {
 			const element = currentElement;
 			if (!this.tree.hasElement(element)) {
@@ -1762,6 +1771,22 @@ export class ChatWidget extends Disposable implements IChatWidget {
 				this.tree.reveal(element, 0);
 			}
 		}
+	}
+
+	private _flushPendingScrollToCurrentItem(): void {
+		const pending = this.pendingScrollToCurrentItem;
+		this.pendingScrollToCurrentItem = undefined;
+		if (pending) {
+			this.scrollToCurrentItem(pending);
+		}
+	}
+
+	private _setScrollPause(): void {
+		this.scrollPauseActive = true;
+		this.scrollPauseDisposable.value = disposableTimeout(() => {
+			this.scrollPauseActive = false;
+			this._flushPendingScrollToCurrentItem();
+		}, 100);
 	}
 
 	private onContextMenu(e: ITreeContextMenuEvent<ChatTreeItem | null>): void {

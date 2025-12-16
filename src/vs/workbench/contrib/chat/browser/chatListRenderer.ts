@@ -4,6 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as dom from '../../../../base/browser/dom.js';
+import { disposableTimeout } from '../../../../base/common/async.js';
 import { renderFormattedText } from '../../../../base/browser/formattedTextRenderer.js';
 import { StandardKeyboardEvent } from '../../../../base/browser/keyboardEvent.js';
 import { IActionViewItemOptions } from '../../../../base/browser/ui/actionbar/actionViewItems.js';
@@ -23,7 +24,7 @@ import { FuzzyScore } from '../../../../base/common/filters.js';
 import { IMarkdownString, MarkdownString } from '../../../../base/common/htmlContent.js';
 import { Iterable } from '../../../../base/common/iterator.js';
 import { KeyCode } from '../../../../base/common/keyCodes.js';
-import { Disposable, DisposableStore, IDisposable, dispose, thenIfNotDisposed, toDisposable } from '../../../../base/common/lifecycle.js';
+import { Disposable, DisposableStore, IDisposable, dispose, thenIfNotDisposed, toDisposable, MutableDisposable } from '../../../../base/common/lifecycle.js';
 import { ResourceMap } from '../../../../base/common/map.js';
 import { FileAccess, Schemas } from '../../../../base/common/network.js';
 import { clamp } from '../../../../base/common/numbers.js';
@@ -197,6 +198,9 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 	 * TODO@roblourens shouldn't use the CodeBlockModelCollection at all
 	 */
 	private readonly _toolInvocationCodeBlockCollection: CodeBlockModelCollection;
+	private readonly pendingHeightUpdates = new Set<IChatListItemTemplate>();
+	private readonly scrollPauseDisposable = this._register(new MutableDisposable<IDisposable>());
+	private _isScrollPaused = false;
 
 	/**
 	 * Prevents re-announcement of already rendered chat progress
@@ -233,6 +237,9 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 
 		this._register(this.instantiationService.createInstance(ChatCodeBlockContentProvider));
 		this._toolInvocationCodeBlockCollection = this._register(this.instantiationService.createInstance(CodeBlockModelCollection, 'tools'));
+		if (this.delegate.onDidScroll) {
+			this._register(this.delegate.onDidScroll(() => this._handleScroll()));
+		}
 	}
 
 	public updateOptions(options: IChatListItemRendererOptions): void {
@@ -253,6 +260,38 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 		} else {
 			this.logService.trace(`ChatListItemRenderer#${method}: ${message}`);
 		}
+	}
+
+	private _handleScroll(): void {
+		this._isScrollPaused = true;
+		this.scrollPauseDisposable.value = disposableTimeout(() => {
+			this._isScrollPaused = false;
+			this._flushPendingHeightUpdates();
+		}, 100);
+	}
+
+	private _queueHeightUpdate(templateData: IChatListItemTemplate): void {
+		this.pendingHeightUpdates.add(templateData);
+	}
+
+	private _flushPendingHeightUpdates(): void {
+		if (!this.pendingHeightUpdates.size) {
+			return;
+		}
+		for (const templateData of this.pendingHeightUpdates) {
+			this._updateHeightForTemplate(templateData);
+		}
+		this.pendingHeightUpdates.clear();
+	}
+
+	private _updateHeightForTemplate(templateData: IChatListItemTemplate): void {
+		const element = templateData.currentElement;
+		if (!element) {
+			return;
+		}
+		const newHeight = Math.max(templateData.rowContainer.offsetHeight, 1);
+		element.currentRenderedHeight = newHeight;
+		this._onDidChangeItemHeight.fire({ element, height: newHeight });
 	}
 
 	/**
@@ -900,26 +939,33 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 	updateItemHeightOnRender(element: ChatTreeItem, templateData: IChatListItemTemplate) {
 		const newHeight = templateData.rowContainer.offsetHeight;
 		const fireEvent = !element.currentRenderedHeight || element.currentRenderedHeight !== newHeight;
-		element.currentRenderedHeight = newHeight;
-		if (fireEvent) {
-			const disposable = templateData.elementDisposables.add(dom.scheduleAtNextAnimationFrame(dom.getWindow(templateData.value), () => {
-				// Have to recompute the height here because codeblock rendering is currently async and it may have changed.
-				// If it becomes properly sync, then this could be removed.
-				element.currentRenderedHeight = templateData.rowContainer.offsetHeight;
-				disposable.dispose();
-				this._onDidChangeItemHeight.fire({ element, height: element.currentRenderedHeight });
-			}));
+		if (!fireEvent) {
+			return;
 		}
+		if (this._isScrollPaused) {
+			this._queueHeightUpdate(templateData);
+			return;
+		}
+		const disposable = templateData.elementDisposables.add(dom.scheduleAtNextAnimationFrame(dom.getWindow(templateData.value), () => {
+			if (this._isScrollPaused) {
+				this._queueHeightUpdate(templateData);
+				disposable.dispose();
+				return;
+			}
+			this._updateHeightForTemplate(templateData);
+			disposable.dispose();
+		}, 0));
 	}
 
 	private updateItemHeight(templateData: IChatListItemTemplate): void {
 		if (!templateData.currentElement) {
 			return;
 		}
-
-		const newHeight = Math.max(templateData.rowContainer.offsetHeight, 1);
-		templateData.currentElement.currentRenderedHeight = newHeight;
-		this._onDidChangeItemHeight.fire({ element: templateData.currentElement, height: newHeight });
+		if (this._isScrollPaused) {
+			this._queueHeightUpdate(templateData);
+			return;
+		}
+		this._updateHeightForTemplate(templateData);
 	}
 
 	/**
