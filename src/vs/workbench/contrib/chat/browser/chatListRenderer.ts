@@ -361,6 +361,9 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 		}
 
 		this.pendingHeightChanges.set(element, height);
+		if (this.pendingHeightChanges.size > 5) {
+			this.flushHeightChanges();
+		}
 		if (!this.heightChangeScheduler.isScheduled()) {
 			this.heightChangeScheduler.schedule();
 		}
@@ -1819,10 +1822,6 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 }
 
 export class ChatListDelegate implements IListVirtualDelegate<ChatTreeItem> {
-	private static readonly approxCharsPerLine = 68;
-	private static readonly lineHeight = 18;
-	private static readonly requestHeaderHeight = 52;
-	private static readonly responseHeaderHeight = 68;
 	constructor(
 		private readonly defaultElementHeight: number,
 		@ILogService private readonly logService: ILogService
@@ -1849,60 +1848,6 @@ export class ChatListDelegate implements IListVirtualDelegate<ChatTreeItem> {
 
 	hasDynamicHeight(element: ChatTreeItem): boolean {
 		return true;
-	}
-
-	getDynamicHeight(element: ChatTreeItem): number | null {
-		const measuredHeight = element.currentRenderedHeight;
-		if (measuredHeight && measuredHeight > 0) {
-			return measuredHeight;
-		}
-
-		const estimate = this.estimateHeight(element);
-		return estimate === null ? null : Math.max(1, estimate);
-	}
-
-	private estimateHeight(element: ChatTreeItem): number | null {
-		const text = this.getTextForElement(element);
-		if (text === undefined) {
-			return null;
-		}
-
-		const textHeight = this.estimateTextHeight(text);
-		const extraHeight = this.estimateExtraHeight(element);
-		return Math.max(this.defaultElementHeight, textHeight + extraHeight);
-	}
-
-	private getTextForElement(element: ChatTreeItem): string | undefined {
-		if (isRequestVM(element)) {
-			return element.messageText;
-		}
-
-		return element.response.getMarkdown();
-	}
-
-	private estimateTextHeight(content: string): number {
-		const lines = content.split(/\r?\n/).reduce((count, line) => {
-			const normalizedLength = line.length;
-			return count + Math.max(1, Math.ceil(normalizedLength / ChatListDelegate.approxCharsPerLine));
-		}, 0);
-		return Math.max(1, lines) * ChatListDelegate.lineHeight;
-	}
-
-	private estimateExtraHeight(element: ChatTreeItem): number {
-		if (isRequestVM(element)) {
-			const variables = Math.min(element.variables.length, 4);
-			const confirmation = element.confirmation ? 18 : 0;
-			return ChatListDelegate.requestHeaderHeight + variables * 8 + confirmation;
-		}
-
-		const referenceCount = Math.min(element.contentReferences.length, 3);
-		const progressPresent = element.progressMessages.length > 0 ? 1 : 0;
-		const citationCount = element.codeCitations.length ? 1 : 0;
-		return ChatListDelegate.responseHeaderHeight
-			+ referenceCount * 12
-			+ progressPresent * 16
-			+ citationCount * 14
-			+ Math.min(element.response.value.length, 5) * 4;
 	}
 }
 
