@@ -1839,25 +1839,10 @@ export class ChatListDelegate implements IListVirtualDelegate<ChatTreeItem> {
 		return ChatListItemRenderer.ID;
 	}
 
-	getDynamicHeight(element: ChatTreeItem): number | null {
-		const kind = isRequestVM(element) ? 'request' : 'response';
-		const height = element.currentRenderedHeight;
-		this._traceLayout('getDynamicHeight', `${kind}, height=${height ?? 'null'}`);
-		return typeof height === 'number' && height > 0 ? height : null;
-	}
-
 	hasDynamicHeight(element: ChatTreeItem): boolean {
 		return true;
 	}
 
-	setDynamicHeight(element: ChatTreeItem, height: number): void {
-		if (height <= 0) {
-			return;
-		}
-		const kind = isRequestVM(element) ? 'request' : 'response';
-		this._traceLayout('setDynamicHeight', `${kind}, height=${height}`);
-		element.currentRenderedHeight = height;
-	}
 }
 
 const voteDownDetailLabels: Record<ChatAgentVoteDownReason, string> = {
