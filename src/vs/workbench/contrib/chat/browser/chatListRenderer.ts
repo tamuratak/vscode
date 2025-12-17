@@ -1846,7 +1846,6 @@ export class ChatListDelegate implements IListVirtualDelegate<ChatTreeItem> {
 	hasDynamicHeight(element: ChatTreeItem): boolean {
 		return true;
 	}
-
 }
 
 const voteDownDetailLabels: Record<ChatAgentVoteDownReason, string> = {
