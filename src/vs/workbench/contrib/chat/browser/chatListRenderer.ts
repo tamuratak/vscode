@@ -361,7 +361,7 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 		}
 
 		this.pendingHeightChanges.set(element, height);
-		if (this.pendingHeightChanges.size > 5) {
+		if (this.pendingHeightChanges.size > 3) {
 			this.flushHeightChanges();
 		}
 		if (!this.heightChangeScheduler.isScheduled()) {
