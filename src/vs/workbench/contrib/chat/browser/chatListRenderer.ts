@@ -1769,6 +1769,7 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 	}
 
 	disposeTemplate(templateData: IChatListItemTemplate): void {
+		this.clearRenderedParts(templateData);
 		templateData.templateDisposables.dispose();
 	}
 
