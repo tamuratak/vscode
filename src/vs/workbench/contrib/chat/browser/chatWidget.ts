@@ -1474,6 +1474,8 @@ export class ChatWidget extends Disposable implements IChatWidget {
 			this.viewModel,
 		));
 
+		delegate.setHeightProvider(item => this.renderer.getMeasuredHeight(item));
+
 		this._register(this.renderer.onDidClickRequest(async item => {
 			this.clickedRequest(item);
 		}));

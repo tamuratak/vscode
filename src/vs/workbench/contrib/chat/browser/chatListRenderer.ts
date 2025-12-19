@@ -325,6 +325,19 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 		return undefined;
 	}
 
+	getMeasuredHeight(element: ChatTreeItem): number | undefined {
+		const templateData = this.templateDataByRequestId.get(element.id);
+		if (!templateData) {
+			return undefined;
+		}
+		const rowContainer = templateData.rowContainer;
+		if (!rowContainer.isConnected) {
+			return undefined;
+		}
+		const height = rowContainer.offsetHeight;
+		return height > 0 ? height : undefined;
+	}
+
 	setVisible(visible: boolean): void {
 		this._isVisible = visible;
 		this._onDidChangeVisibility.fire(visible);
@@ -1792,6 +1805,12 @@ export class ChatListDelegate implements IListVirtualDelegate<ChatTreeItem> {
 		@ILogService private readonly logService: ILogService
 	) { }
 
+	private heightProvider: ((element: ChatTreeItem) => number | undefined) | undefined;
+
+	setHeightProvider(provider: ((element: ChatTreeItem) => number | undefined) | undefined): void {
+		this.heightProvider = provider;
+	}
+
 	private _traceLayout(method: string, message: string) {
 		if (forceVerboseLayoutTracing) {
 			this.logService.info(`ChatListDelegate#${method}: ${message}`);
@@ -1813,6 +1832,25 @@ export class ChatListDelegate implements IListVirtualDelegate<ChatTreeItem> {
 
 	hasDynamicHeight(element: ChatTreeItem): boolean {
 		return true;
+	}
+
+	getDynamicHeight(element: ChatTreeItem): number | null {
+		const kind = isRequestVM(element) ? 'request' : 'response';
+
+		const measuredHeight = this.heightProvider?.(element);
+		if (typeof measuredHeight === 'number' && measuredHeight > 0) {
+			this._traceLayout('getDynamicHeight', `${kind}, measured height=${measuredHeight}`);
+			return measuredHeight;
+		}
+
+		const cachedHeight = element.currentRenderedHeight;
+		if (typeof cachedHeight === 'number' && cachedHeight > 0) {
+			this._traceLayout('getDynamicHeight', `${kind}, cached height=${cachedHeight}`);
+			return cachedHeight;
+		}
+
+		this._traceLayout('getDynamicHeight', `${kind}, height unknown`);
+		return null;
 	}
 }
 
