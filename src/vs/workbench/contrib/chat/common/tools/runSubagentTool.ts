@@ -59,31 +59,6 @@ interface IRunSubagentToolInputParams {
 	agentName?: string;
 }
 
-function inlineReferenceToMarkdown(part: IChatContentInlineReference): string {
-	const reference = part.inlineReference;
-	let uri: URI;
-	if (URI.isUri(reference)) {
-		uri = reference;
-	} else if (isLocation(reference)) {
-		const rangeFragment = reference.range ? `${reference.range.startLineNumber},${reference.range.startColumn}` : undefined;
-		uri = rangeFragment ? reference.uri.with({ fragment: rangeFragment }) : reference.uri;
-	} else {
-		uri = reference.location.uri;
-	}
-	let label: string;
-	if (part.name) {
-		label = part.name;
-	} else if (URI.isUri(reference)) {
-		label = basename(reference);
-	} else if (isLocation(reference)) {
-		label = basename(reference.uri);
-	} else {
-		label = reference.name ?? basename(reference.location.uri);
-	}
-	const escapedLabel = label.replace(/\\/g, '\\\\').replace(/\]/g, '\\\]').replace(/\[/g, '\\\[').replace(/\(/g, '\\\(').replace(/\)/g, '\\\)');
-	return `[${escapedLabel}](${uri.toString()})\n`;
-}
-
 export class RunSubagentTool extends Disposable implements IToolImpl {
 
 	readonly onDidUpdateToolData: Event<IConfigurationChangeEvent>;
@@ -323,4 +298,29 @@ export class RunSubagentTool extends Disposable implements IToolImpl {
 
 		return variableSet;
 	}
+}
+
+function inlineReferenceToMarkdown(part: IChatContentInlineReference): string {
+	const reference = part.inlineReference;
+	let uri: URI;
+	if (URI.isUri(reference)) {
+		uri = reference;
+	} else if (isLocation(reference)) {
+		const rangeFragment = reference.range ? `${reference.range.startLineNumber},${reference.range.startColumn}` : undefined;
+		uri = rangeFragment ? reference.uri.with({ fragment: rangeFragment }) : reference.uri;
+	} else {
+		uri = reference.location.uri;
+	}
+	let label: string;
+	if (part.name) {
+		label = part.name;
+	} else if (URI.isUri(reference)) {
+		label = basename(reference);
+	} else if (isLocation(reference)) {
+		label = basename(reference.uri);
+	} else {
+		label = reference.name ?? basename(reference.location.uri);
+	}
+	const escapedLabel = label.replace(/\\/g, '\\\\').replace(/\]/g, '\\\]').replace(/\[/g, '\\\[').replace(/\(/g, '\\\(').replace(/\)/g, '\\\)');
+	return `[${escapedLabel}](${uri.toString()})\n`;
 }
