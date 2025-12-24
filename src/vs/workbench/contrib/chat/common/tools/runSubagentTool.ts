@@ -321,6 +321,6 @@ function inlineReferenceToMarkdown(part: IChatContentInlineReference): string {
 	} else {
 		label = reference.name ?? basename(reference.location.uri);
 	}
-	const escapedLabel = label.replace(/\\/g, '\\\\').replace(/\]/g, '\\\]').replace(/\[/g, '\\\[').replace(/\(/g, '\\\(').replace(/\)/g, '\\\)');
+	const escapedLabel = label.replace(/[\\\[\]\(\)]/g, '\\$&');
 	return `[${escapedLabel}](${uri.toString()})\n`;
 }
