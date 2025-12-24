@@ -299,14 +299,14 @@ export class RunSubagentTool extends Disposable implements IToolImpl {
 
 function inlineReferenceToMarkdown(part: IChatContentInlineReference): string {
 	const reference = part.inlineReference;
-	let uri: URI;
+	let refUri: URI;
 	if (URI.isUri(reference)) {
-		uri = reference;
-	} else if (isLocation(reference)) {
-		const rangeFragment = reference.range ? `${reference.range.startLineNumber},${reference.range.startColumn}` : undefined;
-		uri = rangeFragment ? reference.uri.with({ fragment: rangeFragment }) : reference.uri;
+		refUri = reference;
 	} else {
-		uri = reference.location.uri;
+		const range = isLocation(reference) ? reference.range : reference.location.range;
+		const uri = isLocation(reference) ? reference.uri : reference.location.uri;
+		const rangeFragment = range ? `${range.startLineNumber},${range.startColumn}` : undefined;
+		refUri = rangeFragment ? uri.with({ fragment: rangeFragment }) : uri;
 	}
 	let label: string;
 	if (part.name) {
@@ -319,5 +319,5 @@ function inlineReferenceToMarkdown(part: IChatContentInlineReference): string {
 		label = reference.name ?? basename(reference.location.uri);
 	}
 	const escapedLabel = label.replace(/[\\\[\]\(\)]/g, '\\$&');
-	return `[${escapedLabel}](${uri.toString()})\n`;
+	return `[${escapedLabel}](${refUri.toString()})\n`;
 }
