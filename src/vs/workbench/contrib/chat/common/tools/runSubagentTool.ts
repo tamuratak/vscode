@@ -17,7 +17,7 @@ import { ILogService } from '../../../../../platform/log/common/log.js';
 import { IChatAgentRequest, IChatAgentService, UserSelectedTools } from '../chatAgents.js';
 import { ChatModel, IChatRequestModeInstructions } from '../chatModel.js';
 import { IChatModeService } from '../chatModes.js';
-import { IChatProgress, IChatService } from '../chatService.js';
+import { IChatContentInlineReference, IChatProgress, IChatService } from '../chatService.js';
 import { ChatRequestVariableSet } from '../chatVariableEntries.js';
 import { ChatAgentLocation, ChatConfiguration, ChatModeKind } from '../constants.js';
 import { ILanguageModelChatMetadata, ILanguageModelsService } from '../languageModels.js';
@@ -36,6 +36,10 @@ import {
 	VSCodeToolReference,
 	IToolAndToolSetEnablementMap
 } from '../languageModelToolsService.js';
+import { basename } from '../../../../../base/common/resources.js';
+import { URI } from '../../../../../base/common/uri.js';
+import { Location, isLocation } from '../../../../../editor/common/languages.js';
+import { IWorkspaceSymbol } from '../../../search/common/search.js';
 import { ComputeAutomaticInstructions } from '../promptSyntax/computeAutomaticInstructions.js';
 import { ManageTodoListToolToolId } from './manageTodoListTool.js';
 import { createToolSimpleTextResult } from './toolHelpers.js';
@@ -54,6 +58,47 @@ interface IRunSubagentToolInputParams {
 	prompt: string;
 	description: string;
 	agentName?: string;
+}
+
+function inlineReferenceToMarkdown(part: IChatContentInlineReference): string {
+	const uri = inlineReferenceUri(part.inlineReference);
+	const label = part.name ?? inlineReferenceLabel(part.inlineReference);
+	return `[${escapeMarkdownLabel(label)}](${uri.toString()})\n`;
+}
+
+function inlineReferenceUri(reference: URI | Location | IWorkspaceSymbol): URI {
+	if (URI.isUri(reference)) {
+		return reference;
+	}
+
+	if (isLocation(reference)) {
+		const rangeFragment = reference.range ? `${reference.range.startLineNumber},${reference.range.startColumn}` : undefined;
+		return rangeFragment ? reference.uri.with({ fragment: rangeFragment }) : reference.uri;
+	}
+
+	return reference.location.uri;
+}
+
+function inlineReferenceLabel(reference: URI | Location | IWorkspaceSymbol): string {
+	if (URI.isUri(reference)) {
+		return basename(reference);
+	}
+
+	if (isLocation(reference)) {
+		const label = basename(reference.uri);
+		if (reference.range) {
+			const { startLineNumber, endLineNumber } = reference.range;
+			const suffix = startLineNumber === endLineNumber ? `:${startLineNumber}` : `:${startLineNumber}-${endLineNumber}`;
+			return `${label}${suffix}`;
+		}
+		return label;
+	}
+
+	return reference.name ?? basename(reference.location.uri);
+}
+
+function escapeMarkdownLabel(value: string): string {
+	return value.replace(/\\/g, '\\\\').replace(/\]/g, '\\\]').replace(/\[/g, '\\\[').replace(/\(/g, '\\\(').replace(/\)/g, '\\\)');
 }
 
 export class RunSubagentTool extends Disposable implements IToolImpl {
@@ -202,6 +247,14 @@ export class RunSubagentTool extends Disposable implements IToolImpl {
 						if (part.kind === 'prepareToolInvocation') {
 							markdownParts.length = 0; // Clear previously collected markdown
 						}
+					} else if (part.kind === 'inlineReference') {
+						if (inEdit) {
+							model.acceptResponseProgress(request, { kind: 'markdownContent', content: new MarkdownString('\n```\n\n'), fromSubagent: true });
+							inEdit = false;
+						}
+
+						// Convert inline references into markdown links for the tool result
+						markdownParts.push(inlineReferenceToMarkdown(part));
 					} else if (part.kind === 'markdownContent') {
 						if (inEdit) {
 							model.acceptResponseProgress(request, { kind: 'markdownContent', content: new MarkdownString('\n```\n\n'), fromSubagent: true });
