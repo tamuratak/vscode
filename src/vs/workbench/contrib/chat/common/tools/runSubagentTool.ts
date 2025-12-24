@@ -205,22 +205,19 @@ export class RunSubagentTool extends Disposable implements IToolImpl {
 						if (part.kind === 'prepareToolInvocation') {
 							markdownParts.length = 0; // Clear previously collected markdown
 						}
-					} else if (part.kind === 'inlineReference') {
+					} else if (part.kind === 'markdownContent' || part.kind === 'inlineReference') {
 						if (inEdit) {
 							model.acceptResponseProgress(request, { kind: 'markdownContent', content: new MarkdownString('\n```\n\n'), fromSubagent: true });
 							inEdit = false;
 						}
 
-						// Convert inline references into markdown links for the tool result
-						markdownParts.push(inlineReferenceToMarkdown(part));
-					} else if (part.kind === 'markdownContent') {
-						if (inEdit) {
-							model.acceptResponseProgress(request, { kind: 'markdownContent', content: new MarkdownString('\n```\n\n'), fromSubagent: true });
-							inEdit = false;
+						if (part.kind === 'inlineReference') {
+							// Convert inline references into markdown links for the tool result
+							markdownParts.push(inlineReferenceToMarkdown(part));
+						} else {
+							// Collect markdown content for the tool result
+							markdownParts.push(part.content.value);
 						}
-
-						// Collect markdown content for the tool result
-						markdownParts.push(part.content.value);
 					}
 				}
 			};
