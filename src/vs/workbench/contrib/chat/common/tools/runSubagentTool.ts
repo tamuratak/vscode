@@ -38,8 +38,7 @@ import {
 } from '../languageModelToolsService.js';
 import { basename } from '../../../../../base/common/resources.js';
 import { URI } from '../../../../../base/common/uri.js';
-import { Location, isLocation } from '../../../../../editor/common/languages.js';
-import { IWorkspaceSymbol } from '../../../search/common/search.js';
+import { isLocation } from '../../../../../editor/common/languages.js';
 import { ComputeAutomaticInstructions } from '../promptSyntax/computeAutomaticInstructions.js';
 import { ManageTodoListToolToolId } from './manageTodoListTool.js';
 import { createToolSimpleTextResult } from './toolHelpers.js';
@@ -61,44 +60,28 @@ interface IRunSubagentToolInputParams {
 }
 
 function inlineReferenceToMarkdown(part: IChatContentInlineReference): string {
-	const uri = inlineReferenceUri(part.inlineReference);
-	const label = part.name ?? inlineReferenceLabel(part.inlineReference);
-	return `[${escapeMarkdownLabel(label)}](${uri.toString()})\n`;
-}
-
-function inlineReferenceUri(reference: URI | Location | IWorkspaceSymbol): URI {
+	const reference = part.inlineReference;
+	let uri: URI;
 	if (URI.isUri(reference)) {
-		return reference;
-	}
-
-	if (isLocation(reference)) {
+		uri = reference;
+	} else if (isLocation(reference)) {
 		const rangeFragment = reference.range ? `${reference.range.startLineNumber},${reference.range.startColumn}` : undefined;
-		return rangeFragment ? reference.uri.with({ fragment: rangeFragment }) : reference.uri;
+		uri = rangeFragment ? reference.uri.with({ fragment: rangeFragment }) : reference.uri;
+	} else {
+		uri = reference.location.uri;
 	}
-
-	return reference.location.uri;
-}
-
-function inlineReferenceLabel(reference: URI | Location | IWorkspaceSymbol): string {
-	if (URI.isUri(reference)) {
-		return basename(reference);
+	let label: string;
+	if (part.name) {
+		label = part.name;
+	} else if (URI.isUri(reference)) {
+		label = basename(reference);
+	} else if (isLocation(reference)) {
+		label = basename(reference.uri);
+	} else {
+		label = reference.name ?? basename(reference.location.uri);
 	}
-
-	if (isLocation(reference)) {
-		const label = basename(reference.uri);
-		if (reference.range) {
-			const { startLineNumber, endLineNumber } = reference.range;
-			const suffix = startLineNumber === endLineNumber ? `:${startLineNumber}` : `:${startLineNumber}-${endLineNumber}`;
-			return `${label}${suffix}`;
-		}
-		return label;
-	}
-
-	return reference.name ?? basename(reference.location.uri);
-}
-
-function escapeMarkdownLabel(value: string): string {
-	return value.replace(/\\/g, '\\\\').replace(/\]/g, '\\\]').replace(/\[/g, '\\\[').replace(/\(/g, '\\\(').replace(/\)/g, '\\\)');
+	const escapedLabel = label.replace(/\\/g, '\\\\').replace(/\]/g, '\\\]').replace(/\[/g, '\\\[').replace(/\(/g, '\\\(').replace(/\)/g, '\\\)');
+	return `[${escapedLabel}](${uri.toString()})\n`;
 }
 
 export class RunSubagentTool extends Disposable implements IToolImpl {
