@@ -7,26 +7,27 @@
 
 `ChatWidget` の `createList` から `WorkbenchObjectTree` を生成し、レンダラー／デリゲート／コンテナを渡してツリー UI を組み立てる。
 
-- ChatWidget の tree instanceof WorkbenchObjectTree
-- WorkbenchObjectTree extends ObjectTree
-- ObjectTree extends AbstractTree
-- AbstractTree の view が instanceof TreeNodeList
-- TreeNodeList extends List
-- List の view が satisfies IListView
-
-
 ```mermaid
 classDiagram
-class ChatWidget
-ChatWidget : WorkbenchObjectTree tree
+
+class ChatWidget {
+  WorkbenchObjectTree tree
+  +setModel()
+  -onDidChangeItems()
+}
 
 class WorkbenchObjectTree
-class ObjectTree
-class AbstractTree
-AbstractTree : TreeNodeList view
+class ObjectTree {
+  IObjectTreeModel model
+}
+class AbstractTree {
+  TreeNodeList view
+  ITreeModel model
+}
 class TreeNodeList
-class List
-List : IListView view
+class List {
+  IListView view
+}
 interface IListView
 
 AbstractTree <|-- ObjectTree
@@ -87,3 +88,21 @@ ChatWidget から agent の返答が表示されるまでの流れは次の順�
 
 この経路を追いかければ、チャット入力から `ChatAgentService` の progress → `ChatModel` のイベント → `ChatViewModel`/`ChatWidget` → `ChatListRenderer` の DOM 描画という全体像が把握できます。必要なら、実際のセッションで開発者ツールから `ChatModel` をウォッチするか、`ChatService` の `progressCallback` にブレークポイントを置くとどのタイミングで `acceptResponseProgress`/`setResponse` が走るか確かめられます。
 
+
+## Load session
+
+過去のセッションを読み込むと、`ChatViewPane.showModel()`が `this._widget.setModel(model)` を呼ぶ. UI をまるごと差し替え、履歴と状態が再構築されます。
+
+- [`setModel`](src/vs/workbench/contrib/chat/browser/chatWidget.ts#L1970) はまず `model` が `undefined` なら `viewModel` をクリアしてリストを再描画、同じセッションなら何もしません。
+- [`ChatWidget.onDidChangeItems()`](src/vs/workbench/contrib/chat/browser/chatWidget.ts#L884) で items の変更と
+- ツリーが表示中であれば `onDidChangeItems()` → `scrollToEnd()` でリスト再構築と末尾表示を保証し、レンダラーと入力コンテキストを新しい `viewModel` に切り替え、TODO リストウィジェットも描画します。
+
+```mermaid
+classDiagram
+
+class ChatViewPane {
+  _widget ChatWidget
+  +loadSession()
+  -showModel()
+}
+```
