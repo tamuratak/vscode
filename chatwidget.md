@@ -12,6 +12,8 @@ classDiagram
 
 class ChatWidget {
   WorkbenchObjectTree tree
+  IChatService chatService
+  +acceptInput()
   +setModel()
   -onDidChangeItems()
 }
@@ -36,19 +38,9 @@ List <|-- TreeNodeList
 ```
 
 
-ListView の items は chatWidget からどのような経路で変更されるか調査して
+## ListView の items は chatWidget からどのような経路で変更されるか
 
-ChatWidget 側では `viewModel` から `treeItems` を作って `this.tree.setChildren(null, treeItems, …)` を呼び出し、`createList()` で `WorkbenchObjectTree` を生成してその上にレンダリングしているのが変更の起点です。[src/vs/workbench/contrib/chat/browser/chatWidget.ts#L804-L859][src/vs/workbench/contrib/chat/browser/chatWidget.ts#L1462-L1582]
-
-`WorkbenchObjectTree` は `ObjectTree` を拡張した上で、`setChildren` が `ObjectTreeModel` に委譲されるため、チャットの要素がモデルに差分として流れ込みます。[src/vs/platform/list/browser/listService.ts#L852-L888][src/vs/base/browser/ui/tree/objectTree.ts#L38-L86]
-
-`AbstractTree` 側で `model.onDidSpliceRenderedNodes` を監視して `this.view.splice(...)` を呼び出しており、この `view` が `TreeNodeList`（`List` のサブクラス）なので、差分イベントが `List` の `splice` 経路へと流れます。[src/vs/base/browser/ui/tree/abstractTree.ts#L2479-L2535][src/vs/base/browser/ui/tree/abstractTree.ts#L3199-L3242]
-
-`List.splice` は `CombinedSpliceable`（焦点/選択/アンカー用の TraitSpliceable と `ListView` を束ねたもの）に差分を渡し、そこから `ListView.splice` が呼ばれます。[src/vs/base/browser/ui/list/listWidget.ts#L1547-L1591][src/vs/base/browser/ui/list/splice.ts#L12-L18]
-
-`ListView.splice` の内部では `items: IItem<T>[]`（`ListView` が保持するデータ）を必要な位置で削除/挿入し、DOM を更新・スクロール高さを再計算するので、ここで `ListView` の `items` が実際に書き換えられます。[src/vs/base/browser/ui/list/listView.ts#L295-L320][src/vs/base/browser/ui/list/listView.ts#L617-L741]
-
-以上の链で、ChatWidget が差分を渡すたびに `ListView` の `items` が `ListView.splice` で更新されます。必要であれば、同経路をたどる形で差分の前処理や後処理を追加できます。
+ChatWidget 側では `viewModel` から `treeItems` を作って `ChatWidget.tree.setChildren(null, treeItems, …)`
 
 ## renderer と templateDate
 
@@ -69,25 +61,13 @@ ChatWidget 側では `viewModel` から `treeItems` を作って `this.tree.setC
 
 ChatWidget から agent の返答が表示されるまでの流れは次の順番です：
 
-1. 入力受け取り → `ChatService.sendRequest()`
-   `ChatWidget.acceptInput()` が `_acceptInput()` を呼び出し、`ChatService.sendRequest()` 経由でリクエストを送信します。この段階で入力文の解析や命令ファイルの付加、途中のキャンセル処理も行われます。[src/vs/workbench/contrib/chat/browser/chatWidget.ts#L2173-L2362]
-   その後、`ChatServiceImpl` が `sendRequest` → `_sendRequestAsync` を呼び出し、`ChatModel.addRequest()` でリクエスト/レスポンスのペアを作成して pending リクエストを管理します。[src/vs/workbench/contrib/chat/common/chatServiceImpl.ts#L716-L880]
+1. `ChatWidget.acceptInput()` -> `ChatWidget.chatService.sendRequest()`
 
-2. `ChatAgentService.invokeAgent()` → モデル更新
-   `_sendRequestAsync()` 内で `ChatAgentService.invokeAgent()` を呼び出し、`progressCallback` がプログレスパーツを受け取るたびに `ChatModel.acceptResponseProgress()` を叩いてデータを蓄積し、最終的に `model.setResponse()` で結果を確定します。[src/vs/workbench/contrib/chat/common/chatAgents.ts#L480-L548] [src/vs/workbench/contrib/chat/common/chatModel.ts#L2116-L2184]
+2. `ChatAgentService.invokeAgent()` を呼び出し、`progressCallback` がプログレスパーツを受け取るたびに `ChatModel.acceptResponseProgress()` を叩いてデータを蓄積し、最終的に `model.setResponse()` で結果を確定します。[src/vs/workbench/contrib/chat/common/chatAgents.ts#L480-L548] [src/vs/workbench/contrib/chat/common/chatModel.ts#L2116-L2184]
    これにより `ChatModel` が `addResponse`/`completedRequest` イベントを発火し、ファイル変化・コードブロックなども記録します。[src/vs/workbench/contrib/chat/common/chatModel.ts#L2116-L2184]
 
 3. `ChatViewModel` → `ChatWidget` のリフレッシュ
    `ChatViewModel` は `ChatModel.onDidChange` を監視し、リクエストやレスポンスが追加されるたびに内部 `_items` を更新し、対応する `ChatResponseViewModel` の `onDidChange` で `viewModel.onDidChange` を発火します。[src/vs/workbench/contrib/chat/common/chatViewModel.ts#L287-L352]
-   `ChatWidget.setModel()` ではこの `viewModel.onDidChange` を受けて `onDidChangeItems()` を呼び出し、`WorkbenchObjectTree` の要素を差分更新します。[src/vs/workbench/contrib/chat/browser/chatWidget.ts#L1971-L2050] `onDidChangeItems()` は `viewModel.getItems()` を元に `tree.setChildren()` を叩き、表示内容を再構築します。[src/vs/workbench/contrib/chat/browser/chatWidget.ts#L804-L860]
-
-4. Tree → `ChatListRenderer` で DOM を生成
-   `createList()` で `WorkbenchObjectTree` と `ChatListItemRenderer` を組み合わせ、ビューにバインドします。[src/vs/workbench/contrib/chat/browser/chatWidget.ts#L1452-L1548]
-   `ChatListItemRenderer.renderChatTreeItem()` は各 `IChatRequestViewModel`/`IChatResponseViewModel` を受けてヘッダーやアバターを調整し、`renderChatResponseBasic()` や `renderChatContentDiff()` で Markdown/ツール呼び出し/引用などを DOM に差分レンダリングします。[src/vs/workbench/contrib/chat/browser/chatListRenderer.ts#L528-L1097]
-   プログレス更新のたびに `renderChatContentDiff()` が呼ばれて新旧のパーツを比較・差し替えるため、agent からストリーミングされた部分も自然に表示されます。[src/vs/workbench/contrib/chat/browser/chatListRenderer.ts#L992-L1070]
-
-この経路を追いかければ、チャット入力から `ChatAgentService` の progress → `ChatModel` のイベント → `ChatViewModel`/`ChatWidget` → `ChatListRenderer` の DOM 描画という全体像が把握できます。必要なら、実際のセッションで開発者ツールから `ChatModel` をウォッチするか、`ChatService` の `progressCallback` にブレークポイントを置くとどのタイミングで `acceptResponseProgress`/`setResponse` が走るか確かめられます。
-
 
 ## Load session
 
