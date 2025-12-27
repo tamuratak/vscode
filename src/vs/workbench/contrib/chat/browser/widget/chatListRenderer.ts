@@ -180,6 +180,8 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 
 	protected readonly _onDidChangeItemHeight = this._register(new Emitter<IItemHeightChangeParams>());
 	readonly onDidChangeItemHeight: Event<IItemHeightChangeParams> = this._onDidChangeItemHeight.event;
+	private readonly pendingHeightChanges = new Map<ChatTreeItem, number>();
+	private heightChangeFlushDisposable: IDisposable | undefined;
 
 	private readonly _editorPool: EditorPool;
 	private readonly _toolEditorPool: EditorPool;
@@ -190,6 +192,9 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 	private _currentLayoutWidth: number = 0;
 	private _isVisible = true;
 	private _onDidChangeVisibility = this._register(new Emitter<boolean>());
+
+	private readonly pendingHeightUpdates = new Map<IChatListItemTemplate, ChatTreeItem>();
+	private heightMeasurementDisposable: IDisposable | undefined;
 
 	/**
 	 * Tool invocations get their own so that the ChatViewModel doesn't overwrite it.
@@ -343,6 +348,48 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 				diffEditor.layout(this._currentLayoutWidth);
 			}
 		}
+	}
+
+	private queueHeightChange(element: ChatTreeItem, height: number): void {
+		if (height <= 0) {
+			return;
+		}
+
+		const previousHeight = this.pendingHeightChanges.get(element);
+		if (previousHeight === height) {
+			return;
+		}
+
+		this.pendingHeightChanges.set(element, height);
+		this._scheduleHeightChangeFlush();
+	}
+
+	private flushHeightChanges(): void {
+		if (!this.pendingHeightChanges.size) {
+			return;
+		}
+
+		const entries = Array.from(this.pendingHeightChanges.entries());
+		this.pendingHeightChanges.clear();
+		for (const [element, height] of entries) {
+			this._onDidChangeItemHeight.fire({ element, height });
+		}
+	}
+
+	private _scheduleHeightChangeFlush(): void {
+		if (this.heightChangeFlushDisposable) {
+			return;
+		}
+
+		const targetWindow = dom.getWindow(this.delegate.container);
+		if (!targetWindow) {
+			return;
+		}
+
+		this.heightChangeFlushDisposable = dom.scheduleAtNextAnimationFrame(targetWindow, () => {
+			this.heightChangeFlushDisposable = undefined;
+			this.flushHeightChanges();
+		});
 	}
 
 	renderTemplate(container: HTMLElement): IChatListItemTemplate {
@@ -755,7 +802,7 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 		const diff = this.diff(templateData.renderedParts ?? [], content, element);
 		this.renderChatContentDiff(diff, content, element, index, templateData);
 
-		this.updateItemHeightOnRender(element, templateData);
+		this.queueHeightMeasurement(element, templateData);
 	}
 
 	private shouldShowWorkingProgress(element: IChatResponseViewModel, partsToRender: IChatRendererContent[], templateData: IChatListItemTemplate): boolean {
@@ -897,7 +944,7 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 			templateData.elementDisposables.add(newPart);
 		}
 
-		this.updateItemHeightOnRender(element, templateData);
+		this.queueHeightMeasurement(element, templateData);
 	}
 
 	updateItemHeightOnRender(element: ChatTreeItem, templateData: IChatListItemTemplate) {
@@ -910,23 +957,41 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 				// If it becomes properly sync, then this could be removed.
 				if (templateData.rowContainer.isConnected) {
 					element.currentRenderedHeight = templateData.rowContainer.offsetHeight;
-					this._onDidChangeItemHeight.fire({ element, height: element.currentRenderedHeight });
+					this.queueHeightChange(element, element.currentRenderedHeight);
 				}
 				disposable.dispose();
 			}));
 		}
 	}
 
+	private queueHeightMeasurement(element: ChatTreeItem, templateData: IChatListItemTemplate): void {
+		// Batch height checks so frequent renderElement calls share a single animation frame.
+		this.pendingHeightUpdates.set(templateData, element);
+		if (this.heightMeasurementDisposable) {
+			return;
+		}
+		const targetWindow = dom.getWindow(templateData.value);
+		if (!targetWindow) {
+			return;
+		}
+		this.heightMeasurementDisposable = dom.scheduleAtNextAnimationFrame(targetWindow, () => {
+			this.heightMeasurementDisposable = undefined;
+			const queued = Array.from(this.pendingHeightUpdates.entries());
+			this.pendingHeightUpdates.clear();
+			for (const [template, queuedElement] of queued) {
+				this.updateItemHeightOnRender(queuedElement, template);
+			}
+		});
+	}
+
 	private updateItemHeight(templateData: IChatListItemTemplate): void {
-		if (!templateData.currentElement) {
+		const element = templateData.currentElement;
+		if (!element || !templateData.rowContainer.isConnected) {
 			return;
 		}
 
-		if (templateData.rowContainer.isConnected) {
-			const newHeight = templateData.rowContainer.offsetHeight;
-			templateData.currentElement.currentRenderedHeight = newHeight;
-			this._onDidChangeItemHeight.fire({ element: templateData.currentElement, height: newHeight });
-		}
+		// Defer height measurement to the shared animation-frame queue to avoid extra reflows.
+		this.queueHeightMeasurement(element, templateData);
 	}
 
 	/**
@@ -982,7 +1047,7 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 		const height = templateData.rowContainer.offsetHeight;
 		element.currentRenderedHeight = height;
 		if (!isInRenderElement) {
-			this._onDidChangeItemHeight.fire({ element, height });
+			this.queueHeightChange(element, height);
 		}
 
 		return false;
@@ -1401,6 +1466,12 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 	}
 
 	override dispose(): void {
+		this.heightMeasurementDisposable?.dispose();
+		this.heightMeasurementDisposable = undefined;
+		this.heightChangeFlushDisposable?.dispose();
+		this.heightChangeFlushDisposable = undefined;
+		this.pendingHeightUpdates.clear();
+		this.pendingHeightChanges.clear();
 		this._announcedToolProgressKeys.clear();
 		super.dispose();
 	}
@@ -1751,6 +1822,7 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 	disposeElement(node: ITreeNode<ChatTreeItem, FuzzyScore>, index: number, templateData: IChatListItemTemplate, details?: IListElementRenderDetails): void {
 		this.traceLayout('disposeElement', `Disposing element, index=${index}`);
 		templateData.elementDisposables.clear();
+		this.pendingHeightUpdates.delete(templateData);
 
 		if (templateData.currentElement && !this.viewModel?.editing) {
 			this.templateDataByRequestId.delete(templateData.currentElement.id);
