@@ -61,6 +61,21 @@ ChatWidget 側では `viewModel` から `treeItems` を作って `ChatWidget.tre
 
 ChatWidget から agent の返答が表示されるまでの流れは次の順番です：
 
+```mermaid
+%% Example: sequence diagram showing method calls
+sequenceDiagram
+    participant A as ChatWidget
+    participant B as ChatService
+    participant C as ChatAgentService
+
+    A->>B: acceptInput()
+    B->>C: sendRequest()
+	C->>C: invokeAgent()
+    C-->>B: result
+    B-->>A: result
+```
+
+
 1. `ChatWidget.acceptInput()` -> `ChatWidget.chatService.sendRequest()`
 
 2. `ChatAgentService.invokeAgent()` を呼び出し、`progressCallback` がプログレスパーツを受け取るたびに `ChatModel.acceptResponseProgress()` を叩いてデータを蓄積し、最終的に `model.setResponse()` で結果を確定します。[src/vs/workbench/contrib/chat/common/chatAgents.ts#L480-L548] [src/vs/workbench/contrib/chat/common/chatModel.ts#L2116-L2184]
@@ -86,3 +101,4 @@ class ChatViewPane {
   -showModel()
 }
 ```
+
