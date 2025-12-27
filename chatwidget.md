@@ -57,6 +57,32 @@ ChatWidget 側では `viewModel` から `treeItems` を作って `ChatWidget.tre
 - `ListView` は `items: IItem<T>[]` という配列で現在の DOM 行を管理し、`splice` → `_splice` で差分を反映します。新しい要素を挿入するたびに `virtualDelegate.getTemplateId` で renderer を決め、`row.templateData` を保持した `IRow` を再利用しながら DOM を差し替えます。また `_splice` 中で既存 `row.templateData` を `renderer.disposeElement` に渡して解放する仕組みにより、テンプレート情報を `ListView` が握りながら renderer に受け渡し続けます。[listView.ts#L290-L340](src/vs/base/browser/ui/list/listView.ts#L290-L340)／[listView.ts#L617-L700](src/vs/base/browser/ui/list/listView.ts#L617-L700)
 - つまり `templateData` は `ChatListItemRenderer.renderTemplate` で作られた後、`ListView.items` の対応する `row`（`IRow.templateData`）として保持され、差分が入るたびに `ListView.splice`→`renderer.renderElement()/disposeElement()` 経路で更新・破棄されています。これが “テンプレートデータが ListView に保存され、必要なときに renderer に渡される” 経路です。
 
+
+```mermaid
+sequenceDiagram
+    %% Participants representing the components in the flow
+    participant CW as ChatWidget
+    participant WOT as WorkbenchObjectTree
+    participant OTM as ObjectTreeModel
+    participant AT as AbstractTree
+    participant TNL as TreeNodeList
+    participant LV as ListView
+    participant R as ChatListItemRenderer
+
+
+    CW->>WOT: viewModel.getItems()
+    WOT->>OTM: setChildren()
+    OTM->>AT: onDidSpliceRenderedNodes()
+    AT->>TNL: TreeNodeList.splice
+    TNL->>LV: super.splice -> ListView.splice
+    LV->>LV: _splice
+    LV->>R: renderTemplate()
+    R-->>LV: IChatListItemTemplate
+    LV->>LV: store row.templateData
+    LV->>R: renderer.renderElement
+    R-->>LV: updated/cleared templateData
+```
+
 ## Agent への request から結果の表示まで
 
 ChatWidget から agent の返答が表示されるまでの流れは次の順番です：
