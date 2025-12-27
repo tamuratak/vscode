@@ -49,6 +49,25 @@ ChatWidget 側では `viewModel` から `treeItems` を作って `ChatWidget.tre
 - `templateData` 自体は `templateDataByRequestId` マップにも保存されていて、`renderChatTreeItem` 内で各要素の `id` をキーに設定・上書きされます（`currentElement` を更新し、マップにも登録したあと、同じテンプレートを別要素で使うときに以前の参照を `clearRenderedParts` でリセットします）。過去にバインドされたテンプレートが不要になると `disposeElement` でマップから削除され、イベントなども解放されます（[src/vs/workbench/contrib/chat/browser/chatListRenderer.ts#L153-L1760](src/vs/workbench/contrib/chat/browser/chatListRenderer.ts#L153-L1760)）。
 - `templateData` の内容は `renderChatTreeItem` で `currentElement` と CSS 状態を更新し、`renderChatResponseBasic`/`renderChatRequest`・`renderChatContentDiff` などで `renderedParts` を差分描画（必要に応じて `clearRenderedParts`/`dispose`）するたびに置き換わります。たとえばリクエスト描画時は `templateData.renderedParts` に新しいパーツ配列をセットし、レスポンスのプログレッシブ描画中は `renderChatContentDiff` で `renderedParts` を差し替えて DOM を更新しています（[src/vs/workbench/contrib/chat/browser/chatListRenderer.ts#L520-L899](src/vs/workbench/contrib/chat/browser/chatListRenderer.ts#L520-L899)）。
 
+```mermaid
+%% Sequence diagram showing templateData lifecycle between ListView and renderer
+sequenceDiagram
+    participant LV as ListView
+    participant R as ChatListItemRenderer
+    participant TI as ChatTreeItem
+    participant MAP as templateDataByRequestId
+
+    LV->>R: renderTemplate()
+    R-->>LV: IChatListItemTemplate (templateData)
+    LV->>LV: store row.templateData
+    LV->>R: renderElement()/renderChatTreeItem(TI)
+    R->>MAP: templateDataByRequestId[id] = templateData
+    R->>templateData: set currentElement = TI
+    R->>templateData: templateData.renderedParts = [RenderedPart,...]
+    R->>templateData: replace renderedParts
+    R->>MAP: delete templateDataByRequestId[id]
+```
+
 ## templateData のながれ
 
 - ChatWidget が `viewModel.getItems()` で `ChatTreeItem` のリストを作り、`this.tree.setChildren(null, treeItems, …)` で `WorkbenchObjectTree` に渡すところから描画が始まります。ここで “差分の ID を設定したツリー要素” を `ObjectTree` に流しているので、新規要素／更新要素がモデルに登録され、リストの再レンダリングがトリガーされます。[chatWidget.ts#L804-L859](src/vs/workbench/contrib/chat/browser/chatWidget.ts#L804-L859)
