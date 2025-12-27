@@ -12,6 +12,7 @@ import { ViewContext } from '../../../common/viewModel/viewContext.js';
 import * as viewEvents from '../../../common/viewEvents.js';
 import { EditorOption } from '../../../common/config/editorOptions.js';
 import * as dom from '../../../../base/browser/dom.js';
+import { IDisposable } from '../../../../base/common/lifecycle.js';
 
 
 interface IWidgetData {
@@ -42,6 +43,8 @@ export class ViewOverlayWidgets extends ViewPart {
 	private _horizontalScrollbarHeight: number;
 	private _editorHeight: number;
 	private _editorWidth: number;
+	private _viewDomNodeRectMeasurement: IDisposable | undefined;
+	private _viewDomNodeRectInitialized = false;
 
 	constructor(context: ViewContext, viewDomNode: FastDomNode<HTMLElement>) {
 		super(context);
@@ -70,6 +73,7 @@ export class ViewOverlayWidgets extends ViewPart {
 	public override dispose(): void {
 		super.dispose();
 		this._widgets = {};
+		this._viewDomNodeRectMeasurement?.dispose();
 	}
 
 	public getDomNode(): FastDomNode<HTMLElement> {
@@ -215,7 +219,61 @@ export class ViewOverlayWidgets extends ViewPart {
 	}
 
 	public prepareRender(ctx: RenderingContext): void {
-		this._viewDomNodeRect = dom.getDomNodePagePosition(this._viewDomNode.domNode);
+		this._scheduleViewDomNodeRectMeasurement();
+	}
+
+	private _scheduleViewDomNodeRectMeasurement(): void {
+		if (!this._hasWidgetsRequiringPageCoords()) {
+			return;
+		}
+
+		if (!this._viewDomNodeRectInitialized) {
+			this._viewDomNodeRect = dom.getDomNodePagePosition(this._viewDomNode.domNode);
+			this._viewDomNodeRectInitialized = true;
+		}
+
+		if (this._viewDomNodeRectMeasurement) {
+			return;
+		}
+
+		const targetWindow = dom.getWindow(this._viewDomNode.domNode);
+		if (!targetWindow) {
+			return;
+		}
+
+		this._viewDomNodeRectMeasurement = dom.scheduleAtNextAnimationFrame(targetWindow, () => {
+			this._viewDomNodeRectMeasurement = undefined;
+			const nextRect = dom.getDomNodePagePosition(this._viewDomNode.domNode);
+			const rectChanged =
+				this._viewDomNodeRect.top !== nextRect.top ||
+				this._viewDomNodeRect.left !== nextRect.left ||
+				this._viewDomNodeRect.width !== nextRect.width ||
+				this._viewDomNodeRect.height !== nextRect.height;
+			this._viewDomNodeRect = nextRect;
+			if (rectChanged) {
+				this.setShouldRender();
+			}
+		});
+	}
+
+	private _hasWidgetsRequiringPageCoords(): boolean {
+		const fixedOverflowWidgets = this._context.configuration.options.get(EditorOption.fixedOverflowWidgets);
+		if (!fixedOverflowWidgets) {
+			return false;
+		}
+
+		const keys = Object.keys(this._widgets);
+		for (let i = 0, len = keys.length; i < len; i++) {
+			const widget = this._widgets[keys[i]];
+			const preference = widget.preference;
+			if (!preference || typeof preference === 'number') {
+				continue;
+			}
+			if (this._widgetCanOverflow(widget.widget)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	public render(ctx: RestrictedRenderingContext): void {
