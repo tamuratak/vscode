@@ -14,6 +14,27 @@
 - TreeNodeList extends List
 - List の view が satisfies IListView
 
+
+```mermaid
+classDiagram
+class ChatWidget
+ChatWidget : WorkbenchObjectTree tree
+
+class WorkbenchObjectTree
+class ObjectTree
+class AbstractTree
+AbstractTree : TreeNodeList view
+class TreeNodeList
+class List
+List : IListView view
+interface IListView
+
+AbstractTree <|-- ObjectTree
+ObjectTree <|-- WorkbenchObjectTree
+List <|-- TreeNodeList
+```
+
+
 ListView の items は chatWidget からどのような経路で変更されるか調査して
 
 ChatWidget 側では `viewModel` から `treeItems` を作って `this.tree.setChildren(null, treeItems, …)` を呼び出し、`createList()` で `WorkbenchObjectTree` を生成してその上にレンダリングしているのが変更の起点です。[src/vs/workbench/contrib/chat/browser/chatWidget.ts#L804-L859][src/vs/workbench/contrib/chat/browser/chatWidget.ts#L1462-L1582]
@@ -65,3 +86,4 @@ ChatWidget から agent の返答が表示されるまでの流れは次の順�
    プログレス更新のたびに `renderChatContentDiff()` が呼ばれて新旧のパーツを比較・差し替えるため、agent からストリーミングされた部分も自然に表示されます。[src/vs/workbench/contrib/chat/browser/chatListRenderer.ts#L992-L1070]
 
 この経路を追いかければ、チャット入力から `ChatAgentService` の progress → `ChatModel` のイベント → `ChatViewModel`/`ChatWidget` → `ChatListRenderer` の DOM 描画という全体像が把握できます。必要なら、実際のセッションで開発者ツールから `ChatModel` をウォッチするか、`ChatService` の `progressCallback` にブレークポイントを置くとどのタイミングで `acceptResponseProgress`/`setResponse` が走るか確かめられます。
+
