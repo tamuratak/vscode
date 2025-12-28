@@ -2,7 +2,6 @@
 
 - background 実行の agent の tool はどのように設定されるか。ユーザの選択が反映されていないようだ。
 - background 実行の git worktree dir を取得する API。ほかの方法があるか。
-- 以降、この会話の要約を `living_doc/agentbackground.md` に追記するよう依頼。
 
 ## Assistant
 
