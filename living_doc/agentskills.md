@@ -28,35 +28,34 @@ classDiagram
 class ChatWidget {
 	- viewModel: ChatViewModel | undefined
 	- inputPart: ChatInputPart
-	- _lockedAgent?: { id: string; name: string; prefix: string; displayName: string }
-	+ render(parent: HTMLElement): void
-	+ setModel(model: IChatModel | undefined): void
-	+ acceptInput(query?: string, options?: IChatAcceptInputOptions): Promise<IChatResponseModel|undefined>
-	- _autoAttachInstructions(requestInput: IChatRequestInputOptions): Promise<void>
+	+ render()
+	+ setModel()
+	+ acceptInput()
+	- _autoAttachInstructions()
 }
 
 class ComputeAutomaticInstructions {
 	- _enabledTools: IToolAndToolSetEnablementMap | undefined
 	- _parseResults: ResourceMap<ParsedPromptFile>
-	+ collect(variables: ChatRequestVariableSet, token: CancellationToken): Promise<void>
-	+ addApplyingInstructions(...): Promise<void>
-	+ _addAgentInstructions(...): Promise<void>
+	+ collect()
+	+ addApplyingInstructions()
+	+ _addAgentInstructions()
 }
 
 class PromptsServiceImpl {
-	+ listPromptFiles(type: PromptsType, token: CancellationToken): Promise<readonly IPromptPath[]>
-	+ parseNew(uri: URI, token: CancellationToken): Promise<ParsedPromptFile>
-	+ listCopilotInstructionsMDs(token: CancellationToken): Promise<URI[]>
-	+ listAgentMDs(token: CancellationToken, includeNested: boolean): Promise<URI[]>
-	+ findAgentSkills(token: CancellationToken): Promise<IAgentSkill[]|undefined>
+	+ listPromptFiles()
+	+ parseNew()
+	+ listCopilotInstructionsMDs()
+	+ listAgentMDs()
+	+ findAgentSkills()
 }
 ```
 
 ```mermaid
 classDiagram
 class PromptFilesLocator {
-	+ findAgentSkillsInWorkspace(token: CancellationToken): Promise<Array<{ uri: URI; type: string }>>
-	+ findAgentSkillsInUserHome(token: CancellationToken): Promise<Array<{ uri: URI; type: string }>>
+	+ findAgentSkillsInWorkspace(token: CancellationToken): Promise
+	+ findAgentSkillsInUserHome(token: CancellationToken): Promise
 	+ findAgentSkillsInFolder(uri: URI, relativePath: string, token: CancellationToken): Promise<URI[]>
 }
 
