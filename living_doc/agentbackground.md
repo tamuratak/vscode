@@ -29,30 +29,31 @@
 ```mermaid
 classDiagram
 class ChatSelectedTools {
-	- _mode
-	- _toolsService
-	- _globalState
-	- _sessionStates
-	+ entriesMap
-	+ userSelectedTools
+	- _mode: IObservable<IChatMode>
+	- _toolsService: ILanguageModelToolsService
+	- _globalState: ObservableMemento<ToolEnablementStates>
+	- _sessionStates: ObservableMap
+	+ entriesMap: IObservable<IToolAndToolSetEnablementMap>
+	+ userSelectedTools: IObservable<UserSelectedTools>
 	+ set()
 	+ resetSessionEnablementState()
 	- updateCustomModeTools()
 }
 class ChatWidget {
-	- input
-	- viewModel
-	- chatService
-	- agentSessionsService
+	- input: ChatInputPart
+	- viewModel: ChatViewModel
+	- chatService: IChatService
+	- agentSessionsService: IAgentSessionsService
 	+ _acceptInput()
 	+ _applyPromptMetadata()
 	+ _autoAttachInstructions()
 	+ getModeRequestOptions()
 }
 class ChatServiceImpl {
-	- _pendingRequests
-	- chatAgentService
-	- configurationService
+	- _sessionModels: ChatModelStore
+	- _pendingRequests: DisposableResourceMap<CancellableRequest>
+	- chatAgentService: IChatAgentService
+	- configurationService: IConfigurationService
 	+ sendRequest()
 	+ prepareChatAgentRequest()
 	+ removeRequest()
@@ -62,21 +63,20 @@ class ChatServiceImpl {
 ```mermaid
 classDiagram
 class ChatAgentService {
-	- registry
-	+ invokeAgent()
+	- _agents: Map<string, IChatAgentEntry>
 	+ detectAgentOrCommand()
 	+ setRequestTools()
 	+ getFollowups()
 	+ getChatTitle()
 }
 class AgentSessionsService {
-	- _model
+	- _model: IAgentSessionsModel
 	+ model
 	+ getSession()
 }
 class AgentSessionsModel {
-	- _sessions
-	- cache
+	- _sessions: ResourceMap<IInternalAgentSession>
+	- cache: AgentSessionsCache
 	+ sessions
 	+ getSession()
 	+ resolve()
