@@ -3,7 +3,6 @@
 ## User
 - `AGENT Skill` の実行パスと概要を調査してほしい。
 - 調査に基づいて、Mermaid 図（少なくとも `classDiagram` と `sequenceDiagram`）を作成してほしい。図は適度に省略して主要コンポーネントと相互作用のみ含めること。
-- 上記の chat セッションをこのファイルに追記して保存してほしい。
 
 ## Assistant
 
