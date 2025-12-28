@@ -26,7 +26,7 @@
 ```mermaid
 classDiagram
 class ChatWidget {
-	- viewModel: ChatViewModel | undefined
+	- viewModel: ChatViewModel
 	- inputPart: ChatInputPart
 	+ render()
 	+ setModel()
@@ -35,7 +35,7 @@ class ChatWidget {
 }
 
 class ComputeAutomaticInstructions {
-	- _enabledTools: IToolAndToolSetEnablementMap | undefined
+	- _enabledTools: IToolAndToolSetEnablementMap
 	- _parseResults: ResourceMap<ParsedPromptFile>
 	+ collect()
 	+ addApplyingInstructions()
@@ -54,14 +54,14 @@ class PromptsServiceImpl {
 ```mermaid
 classDiagram
 class PromptFilesLocator {
-	+ findAgentSkillsInWorkspace(token: CancellationToken): Promise
-	+ findAgentSkillsInUserHome(token: CancellationToken): Promise
-	+ findAgentSkillsInFolder(uri: URI, relativePath: string, token: CancellationToken): Promise<URI[]>
+	+ findAgentSkillsInWorkspace()
+	+ findAgentSkillsInUserHome()
+	+ findAgentSkillsInFolder()
 }
 
 class ChatRequestVariableSet {
-	+ add(entry: IChatRequestVariableEntry): void
-	+ asArray(): IChatRequestVariableEntry[]
+	+ add()
+	+ asArray()
 }
 
 class IAgentSkill {
