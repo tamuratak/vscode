@@ -165,21 +165,7 @@ export class ViewOverlayWidgets extends ViewPart {
 		this._context.viewLayout.setOverlayWidgetsMinWidth(maxMinWidth);
 	}
 
-	private _needsViewDomNodeRectMeasurement(): boolean {
-		if (!this._context.configuration.options.get(EditorOption.fixedOverflowWidgets)) {
-			return false;
-		}
 
-		const keys = Object.keys(this._widgets);
-		for (let i = 0, len = keys.length; i < len; i++) {
-			const widgetData = this._widgets[keys[i]];
-			if (widgetData.preference) {
-				return true;
-			}
-		}
-
-		return false;
-	}
 
 	private _renderWidget(widgetData: IWidgetData, stackCoordinates: number[]): void {
 		const domNode = widgetData.domNode;
@@ -228,6 +214,25 @@ export class ViewOverlayWidgets extends ViewPart {
 				domNode.setPosition('absolute');
 			}
 		}
+	}
+
+	// Determine if we need to update this._viewDomNodeRect.
+	// The conditon depends on the _renderWidget method.
+	private _needsViewDomNodeRectMeasurement(): boolean {
+		if (!this._context.configuration.options.get(EditorOption.fixedOverflowWidgets)) {
+			return false;
+		}
+
+		const keys = Object.keys(this._widgets);
+		for (let i = 0, len = keys.length; i < len; i++) {
+			const widgetData = this._widgets[keys[i]];
+			const preference = widgetData.preference;
+			if (preference && typeof preference !== 'number' && this._widgetCanOverflow(widgetData.widget)) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	public prepareRender(ctx: RenderingContext): void {
