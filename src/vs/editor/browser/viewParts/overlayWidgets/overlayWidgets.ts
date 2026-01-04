@@ -7,7 +7,7 @@ import './overlayWidgets.css';
 import { FastDomNode, createFastDomNode } from '../../../../base/browser/fastDomNode.js';
 import { IOverlayWidget, IOverlayWidgetPosition, IOverlayWidgetPositionCoordinates, OverlayWidgetPositionPreference } from '../../editorBrowser.js';
 import { PartFingerprint, PartFingerprints, ViewPart } from '../../view/viewPart.js';
-import { RestrictedRenderingContext } from '../../view/renderingContext.js';
+import { RenderingContext, RestrictedRenderingContext } from '../../view/renderingContext.js';
 import { ViewContext } from '../../../common/viewModel/viewContext.js';
 import * as viewEvents from '../../../common/viewEvents.js';
 import { EditorOption } from '../../../common/config/editorOptions.js';
@@ -230,7 +230,7 @@ export class ViewOverlayWidgets extends ViewPart {
 		}
 	}
 
-	public prepareRender(): void {
+	public prepareRender(ctx: RenderingContext): void {
 		if (!this._needsViewDomNodeRectMeasurement()) {
 			return;
 		}
