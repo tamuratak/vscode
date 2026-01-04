@@ -12,7 +12,6 @@ import { ViewContext } from '../../../common/viewModel/viewContext.js';
 import * as viewEvents from '../../../common/viewEvents.js';
 import { EditorOption } from '../../../common/config/editorOptions.js';
 import * as dom from '../../../../base/browser/dom.js';
-import { IDisposable } from '../../../../base/common/lifecycle.js';
 
 
 interface IWidgetData {
@@ -43,7 +42,6 @@ export class ViewOverlayWidgets extends ViewPart {
 	private _horizontalScrollbarHeight: number;
 	private _editorHeight: number;
 	private _editorWidth: number;
-	private _viewDomNodeRectMeasurement: IDisposable | undefined;
 
 	constructor(context: ViewContext, viewDomNode: FastDomNode<HTMLElement>) {
 		super(context);
@@ -72,7 +70,6 @@ export class ViewOverlayWidgets extends ViewPart {
 	public override dispose(): void {
 		super.dispose();
 		this._widgets = {};
-		this._viewDomNodeRectMeasurement?.dispose();
 	}
 
 	public getDomNode(): FastDomNode<HTMLElement> {
@@ -168,6 +165,23 @@ export class ViewOverlayWidgets extends ViewPart {
 		this._context.viewLayout.setOverlayWidgetsMinWidth(maxMinWidth);
 	}
 
+	private _needsViewDomNodeRectMeasurement(): boolean {
+		if (!this._context.configuration.options.get(EditorOption.fixedOverflowWidgets)) {
+			return false;
+		}
+
+		const keys = Object.keys(this._widgets);
+		for (let i = 0, len = keys.length; i < len; i++) {
+			const widgetData = this._widgets[keys[i]];
+			const preference = widgetData.preference;
+			if (preference && typeof preference !== 'number' && this._widgetCanOverflow(widgetData.widget)) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	private _renderWidget(widgetData: IWidgetData, stackCoordinates: number[]): void {
 		const domNode = widgetData.domNode;
 
@@ -218,6 +232,9 @@ export class ViewOverlayWidgets extends ViewPart {
 	}
 
 	public prepareRender(): void {
+		if (!this._needsViewDomNodeRectMeasurement()) {
+			return;
+		}
 		this._viewDomNodeRect = dom.getDomNodePagePosition(this._viewDomNode.domNode);
 	}
 
