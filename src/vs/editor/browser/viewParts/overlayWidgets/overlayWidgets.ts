@@ -216,8 +216,7 @@ export class ViewOverlayWidgets extends ViewPart {
 		}
 	}
 
-	// Determine if we need to update this._viewDomNodeRect.
-	// The conditon depends on the _renderWidget method.
+	// Determine if any overflowing widgets need the editor position so _renderWidget can place them in page space.
 	private _needsViewDomNodeRectMeasurement(): boolean {
 		if (!this._context.configuration.options.get(EditorOption.fixedOverflowWidgets)) {
 			return false;
