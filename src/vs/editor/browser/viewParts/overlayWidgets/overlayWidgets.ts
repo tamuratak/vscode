@@ -173,8 +173,7 @@ export class ViewOverlayWidgets extends ViewPart {
 		const keys = Object.keys(this._widgets);
 		for (let i = 0, len = keys.length; i < len; i++) {
 			const widgetData = this._widgets[keys[i]];
-			const preference = widgetData.preference;
-			if (preference && typeof preference !== 'number' && this._widgetCanOverflow(widgetData.widget)) {
+			if (widgetData.preference) {
 				return true;
 			}
 		}
