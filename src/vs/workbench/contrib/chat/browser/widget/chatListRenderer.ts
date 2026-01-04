@@ -22,6 +22,7 @@ import { Emitter, Event } from '../../../../../base/common/event.js';
 import { FuzzyScore } from '../../../../../base/common/filters.js';
 import { IMarkdownString, MarkdownString } from '../../../../../base/common/htmlContent.js';
 import { Iterable } from '../../../../../base/common/iterator.js';
+import { RunOnceScheduler } from '../../../../../base/common/async.js';
 import { KeyCode } from '../../../../../base/common/keyCodes.js';
 import { Disposable, DisposableStore, IDisposable, dispose, thenIfNotDisposed, toDisposable } from '../../../../../base/common/lifecycle.js';
 import { ResourceMap } from '../../../../../base/common/map.js';
@@ -180,6 +181,8 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 
 	protected readonly _onDidChangeItemHeight = this._register(new Emitter<IItemHeightChangeParams>());
 	readonly onDidChangeItemHeight: Event<IItemHeightChangeParams> = this._onDidChangeItemHeight.event;
+	private readonly pendingHeightChanges = new Map<ChatTreeItem, number>();
+	private readonly heightChangeScheduler: RunOnceScheduler;
 
 	private readonly _editorPool: EditorPool;
 	private readonly _toolEditorPool: EditorPool;
@@ -232,6 +235,7 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 		this._diffEditorPool = this._register(this.instantiationService.createInstance(DiffEditorPool, editorOptions, delegate, overflowWidgetsDomNode, false));
 		this._treePool = this._register(this.instantiationService.createInstance(TreePool, this._onDidChangeVisibility.event));
 		this._contentReferencesListPool = this._register(this.instantiationService.createInstance(CollapsibleListPool, this._onDidChangeVisibility.event, undefined, undefined));
+		this.heightChangeScheduler = this._register(new RunOnceScheduler(() => this.flushHeightChanges(), 25));
 
 		this._register(this.instantiationService.createInstance(ChatCodeBlockContentProvider));
 		this._toolInvocationCodeBlockCollection = this._register(this.instantiationService.createInstance(CodeBlockModelCollection, 'tools'));
@@ -345,6 +349,34 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 			for (const diffEditor of this._diffEditorPool.inUse()) {
 				diffEditor.layout(this._currentLayoutWidth);
 			}
+		}
+	}
+
+	private queueHeightChange(element: ChatTreeItem, height: number): void {
+		if (height <= 0) {
+			return;
+		}
+
+		const previousHeight = this.pendingHeightChanges.get(element);
+		if (previousHeight === height) {
+			return;
+		}
+
+		this.pendingHeightChanges.set(element, height);
+		if (!this.heightChangeScheduler.isScheduled()) {
+			this.heightChangeScheduler.schedule();
+		}
+	}
+
+	private flushHeightChanges(): void {
+		if (!this.pendingHeightChanges.size) {
+			return;
+		}
+
+		const entries = Array.from(this.pendingHeightChanges.entries());
+		this.pendingHeightChanges.clear();
+		for (const [element, height] of entries) {
+			this._onDidChangeItemHeight.fire({ element, height });
 		}
 	}
 
@@ -913,7 +945,7 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 				// If it becomes properly sync, then this could be removed.
 				if (templateData.rowContainer.isConnected) {
 					element.currentRenderedHeight = templateData.rowContainer.offsetHeight;
-					this._onDidChangeItemHeight.fire({ element, height: element.currentRenderedHeight });
+					this.queueHeightChange(element, element.currentRenderedHeight);
 				}
 				disposable.dispose();
 			}));
@@ -1000,7 +1032,7 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 		const height = templateData.rowContainer.offsetHeight;
 		element.currentRenderedHeight = height;
 		if (!isInRenderElement) {
-			this._onDidChangeItemHeight.fire({ element, height });
+			this.queueHeightChange(element, height);
 		}
 
 		return false;
