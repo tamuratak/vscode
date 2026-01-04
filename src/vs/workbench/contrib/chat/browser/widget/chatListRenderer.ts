@@ -927,7 +927,7 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 			return;
 		}
 		this.heightMeasurementScheduled = true;
-		dom.scheduleAtNextAnimationFrame(() => {
+		dom.scheduleAtNextAnimationFrame(dom.getWindow(templateData.value), () => {
 			this.heightMeasurementScheduled = false;
 			const queued = Array.from(this.pendingHeightUpdates.entries());
 			this.pendingHeightUpdates.clear();
