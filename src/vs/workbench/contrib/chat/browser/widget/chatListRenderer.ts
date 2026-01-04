@@ -938,15 +938,13 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 	}
 
 	private updateItemHeight(templateData: IChatListItemTemplate): void {
-		if (!templateData.currentElement) {
+		const element = templateData.currentElement;
+		if (!element || !templateData.rowContainer.isConnected) {
 			return;
 		}
 
-		if (templateData.rowContainer.isConnected) {
-			const newHeight = templateData.rowContainer.offsetHeight;
-			templateData.currentElement.currentRenderedHeight = newHeight;
-			this._onDidChangeItemHeight.fire({ element: templateData.currentElement, height: newHeight });
-		}
+		// Defer height measurement to the shared animation-frame queue to avoid extra reflows.
+		this.queueHeightMeasurement(element, templateData);
 	}
 
 	/**
