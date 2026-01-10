@@ -3,7 +3,7 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 import { findLastIdx } from '../../../../../base/common/arraysFind.js';
-import { MarkdownString } from '../../../../../base/common/htmlContent.js';
+import { MarkdownString, IMarkdownString } from '../../../../../base/common/htmlContent.js';
 import { basename } from '../../../../../base/common/resources.js';
 import { URI } from '../../../../../base/common/uri.js';
 import { IRange } from '../../../../../editor/common/core/range.js';
@@ -61,10 +61,9 @@ export function annotateSpecialMarkdownContent(response: Iterable<IChatProgressR
 			if (previousItem?.kind === 'markdownContent') {
 				const isEditText = item.isEdit ? ` isEdit` : '';
 				const markdownText = `<vscode_codeblock_uri${isEditText}>${item.uri.toString()}</vscode_codeblock_uri>`;
-				const merged = appendMarkdownString(previousItem.content, new MarkdownString(markdownText));
-				// delete the previous and append to ensure that we don't reorder the edit before the undo stop containing it
-				result.splice(previousItemIndex, 1);
-				result.push({ ...previousItem, content: merged });
+				const updatedValue = insertCodeblockUri(markdownText, previousItem.content.value);
+				const merged = cloneMarkdownStringWithValue(previousItem.content, updatedValue);
+				result[previousItemIndex] = { ...previousItem, content: merged };
 			}
 		} else {
 			result.push(item);
@@ -72,6 +71,30 @@ export function annotateSpecialMarkdownContent(response: Iterable<IChatProgressR
 	}
 
 	return result;
+}
+
+function insertCodeblockUri(uriText: string, value: string): string {
+	const closingIndex = value.lastIndexOf('```');
+	const insertionPrefix = value.substring(0, closingIndex);
+	if (closingIndex === -1) {
+		return `${value}\n${uriText}\n`;
+	}
+	const newlineBefore = insertionPrefix.endsWith('\n') ? '' : '\n';
+	const insertion = `${newlineBefore}${uriText}\n`;
+	const remainder = value.substring(closingIndex);
+	return `${insertionPrefix}${insertion}${remainder}`;
+}
+
+function cloneMarkdownStringWithValue(source: IMarkdownString, value: string): MarkdownString {
+	const merged = new MarkdownString(value, {
+		isTrusted: source.isTrusted,
+		supportThemeIcons: source.supportThemeIcons ?? false,
+		supportHtml: source.supportHtml ?? false,
+		supportAlertSyntax: source.supportAlertSyntax ?? false,
+	});
+	merged.baseUri = source.baseUri ? URI.revive(source.baseUri) : undefined;
+	merged.uris = source.uris;
+	return merged;
 }
 
 export interface IMarkdownVulnerability {
