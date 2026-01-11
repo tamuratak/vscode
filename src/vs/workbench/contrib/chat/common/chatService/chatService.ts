@@ -152,6 +152,7 @@ export interface IChatMarkdownContent {
 	content: IMarkdownString;
 	inlineReferences?: Record<string, IChatContentInlineReference>;
 	fromSubagent?: boolean;
+	codeBlockMetadata?: readonly IChatResponseCodeblockUriPart[];
 }
 
 export interface IChatTreeData {

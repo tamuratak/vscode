@@ -13,8 +13,8 @@ import { ILanguageService } from '../../../../../editor/common/languages/languag
 import { PLAINTEXT_LANGUAGE_ID } from '../../../../../editor/common/languages/modesRegistry.js';
 import { EndOfLinePreference, ITextModel } from '../../../../../editor/common/model.js';
 import { IResolvedTextEditorModel, ITextModelService } from '../../../../../editor/common/services/resolverService.js';
-import { extractCodeblockUrisFromText, extractVulnerabilitiesFromText, IMarkdownVulnerability } from './annotations.js';
-import { isChatContentVariableReference } from '../chatService/chatService.js';
+import { extractVulnerabilitiesFromText, IMarkdownVulnerability } from './annotations.js';
+import { isChatContentVariableReference, IChatResponseCodeblockUriPart } from '../chatService/chatService.js';
 import { IChatRequestViewModel, IChatResponseViewModel, isResponseVM } from '../model/chatViewModel.js';
 
 
@@ -22,6 +22,7 @@ interface CodeBlockContent {
 	readonly text: string;
 	readonly languageId?: string;
 	readonly isComplete: boolean;
+	readonly codeBlockMetadata?: IChatResponseCodeblockUriPart;
 }
 
 export interface CodeBlockEntry {
@@ -185,19 +186,14 @@ export class CodeBlockModelCollection extends Disposable {
 		}
 
 		const extractedVulns = extractVulnerabilitiesFromText(content.text);
-		let newText = fixCodeText(extractedVulns.newText, content.languageId);
+		const newText = fixCodeText(extractedVulns.newText, content.languageId);
 		if (entry) {
 			entry.vulns = extractedVulns.vulnerabilities;
 		}
 
-		const codeblockUri = extractCodeblockUrisFromText(newText);
-		if (codeblockUri) {
-			if (entry) {
-				entry.codemapperUri = codeblockUri.uri;
-				entry.isEdit = codeblockUri.isEdit;
-			}
-
-			newText = codeblockUri.textWithoutResult;
+		if (content.codeBlockMetadata && entry) {
+			entry.codemapperUri = content.codeBlockMetadata.uri;
+			entry.isEdit = content.codeBlockMetadata.isEdit;
 		}
 
 		if (content.isComplete) {

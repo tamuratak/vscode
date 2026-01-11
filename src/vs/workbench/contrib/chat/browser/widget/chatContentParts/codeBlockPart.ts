@@ -65,6 +65,7 @@ import { getSimpleEditorOptions } from '../../../../codeEditor/browser/simpleEdi
 import { IMarkdownVulnerability } from '../../../common/widget/annotations.js';
 import { ChatContextKeys } from '../../../common/actions/chatContextKeys.js';
 import { IChatResponseModel, IChatTextEditGroup } from '../../../common/model/chatModel.js';
+import { IChatResponseCodeblockUriPart } from '../../../common/chatService/chatService.js';
 import { IChatResponseViewModel, isRequestVM, isResponseVM } from '../../../common/model/chatViewModel.js';
 import { ChatTreeItem } from '../../chat.js';
 import { IChatRendererDelegate } from '../chatListRenderer.js';
@@ -93,6 +94,7 @@ export interface ICodeBlockData {
 	readonly renderOptions?: ICodeBlockRenderOptions;
 
 	readonly chatSessionResource: URI;
+	readonly codeBlockMetadata?: IChatResponseCodeblockUriPart;
 }
 
 /**

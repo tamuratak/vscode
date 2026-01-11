@@ -9,9 +9,19 @@ import { URI } from '../../../../../base/common/uri.js';
 import { IRange } from '../../../../../editor/common/core/range.js';
 import { isLocation } from '../../../../../editor/common/languages.js';
 import { IChatProgressRenderableResponseContent, IChatProgressResponseContent, appendMarkdownString, canMergeMarkdownStrings } from '../model/chatModel.js';
-import { IChatAgentVulnerabilityDetails, IChatMarkdownContent } from '../chatService/chatService.js';
+import { IChatAgentVulnerabilityDetails, IChatMarkdownContent, IChatResponseCodeblockUriPart } from '../chatService/chatService.js';
 
 export const contentRefUrl = 'http://_vscodecontentref_'; // must be lowercase for URI
+
+function mergeCodeBlockMetadata(...metadataCollections: (readonly IChatResponseCodeblockUriPart[] | undefined)[]): readonly IChatResponseCodeblockUriPart[] | undefined {
+	const merged: IChatResponseCodeblockUriPart[] = [];
+	for (const collection of metadataCollections) {
+		if (collection) {
+			merged.push(...collection);
+		}
+	}
+	return merged.length ? merged : undefined;
+}
 
 export function annotateSpecialMarkdownContent(response: Iterable<IChatProgressResponseContent>): IChatProgressRenderableResponseContent[] {
 	let refIdPool = 0;
@@ -46,7 +56,8 @@ export function annotateSpecialMarkdownContent(response: Iterable<IChatProgressR
 			}
 		} else if (item.kind === 'markdownContent' && previousItem?.kind === 'markdownContent' && canMergeMarkdownStrings(previousItem.content, item.content)) {
 			const merged = appendMarkdownString(previousItem.content, item.content);
-			result[previousItemIndex] = { ...previousItem, content: merged };
+			const mergedMetadata = mergeCodeBlockMetadata(previousItem.codeBlockMetadata, item.codeBlockMetadata);
+			result[previousItemIndex] = { ...previousItem, content: merged, codeBlockMetadata: mergedMetadata };
 		} else if (item.kind === 'markdownVuln') {
 			const vulnText = encodeURIComponent(JSON.stringify(item.vulnerabilities));
 			const markdownText = `<vscode_annotation details='${vulnText}'>${item.content.value}</vscode_annotation>`;
@@ -59,12 +70,15 @@ export function annotateSpecialMarkdownContent(response: Iterable<IChatProgressR
 			}
 		} else if (item.kind === 'codeblockUri') {
 			if (previousItem?.kind === 'markdownContent') {
-				const isEditText = item.isEdit ? ` isEdit` : '';
-				const markdownText = `<vscode_codeblock_uri${isEditText}>${item.uri.toString()}</vscode_codeblock_uri>`;
-				const merged = appendMarkdownString(previousItem.content, new MarkdownString(markdownText));
-				// delete the previous and append to ensure that we don't reorder the edit before the undo stop containing it
+				const metadataEntry: IChatResponseCodeblockUriPart = {
+					kind: 'codeblockUri',
+					uri: item.uri,
+					isEdit: item.isEdit,
+					undoStopId: item.undoStopId,
+				};
+				const mergedMetadata = mergeCodeBlockMetadata(previousItem.codeBlockMetadata, [metadataEntry]);
 				result.splice(previousItemIndex, 1);
-				result.push({ ...previousItem, content: merged });
+				result.push({ ...previousItem, codeBlockMetadata: mergedMetadata });
 			}
 		} else {
 			result.push(item);
@@ -102,23 +116,6 @@ export function annotateVulnerabilitiesInText(response: ReadonlyArray<IChatProgr
 	}
 
 	return result;
-}
-
-export function extractCodeblockUrisFromText(text: string): { uri: URI; isEdit?: boolean; textWithoutResult: string } | undefined {
-	const match = /<vscode_codeblock_uri( isEdit)?>(.*?)<\/vscode_codeblock_uri>/ms.exec(text);
-	if (match) {
-		const [all, isEdit, uriString] = match;
-		if (uriString) {
-			const result = URI.parse(uriString);
-			const textWithoutResult = text.substring(0, match.index) + text.substring(match.index + all.length);
-			return { uri: result, textWithoutResult, isEdit: !!isEdit };
-		}
-	}
-	return undefined;
-}
-
-export function hasCodeblockUriTag(text: string): boolean {
-	return text.includes('<vscode_codeblock_uri');
 }
 
 export function extractVulnerabilitiesFromText(text: string): { newText: string; vulnerabilities: IMarkdownVulnerability[] } {

@@ -44,7 +44,7 @@ import { IEditorService, SIDE_GROUP } from '../../../../../services/editor/commo
 import { AccessibilityWorkbenchSettingId } from '../../../../accessibility/browser/accessibilityConfiguration.js';
 import { IAiEditTelemetryService } from '../../../../editTelemetry/browser/telemetry/aiEditTelemetry/aiEditTelemetryService.js';
 import { MarkedKatexSupport } from '../../../../markdown/browser/markedKatexSupport.js';
-import { extractCodeblockUrisFromText, IMarkdownVulnerability } from '../../../common/widget/annotations.js';
+import { IMarkdownVulnerability } from '../../../common/widget/annotations.js';
 import { IEditSessionEntryDiff } from '../../../common/editing/chatEditingService.js';
 import { IChatProgressRenderableResponseContent } from '../../../common/model/chatModel.js';
 import { IChatMarkdownContent, IChatService, IChatUndoStop } from '../../../common/chatService/chatService.js';
@@ -145,6 +145,9 @@ export class ChatMarkdownContentPart extends Disposable implements IChatContentP
 
 		const enableMath = configurationService.getValue<boolean>(ChatConfiguration.EnableMath);
 
+		const codeBlockMetadataQueue = [...(this.markdown.codeBlockMetadata ?? [])];
+		const consumeCodeBlockMetadata = () => codeBlockMetadataQueue.shift();
+
 		const doRenderMarkdown = () => {
 			if (this._store.isDisposed) {
 				return;
@@ -171,8 +174,9 @@ export class ChatMarkdownContentPart extends Disposable implements IChatContentP
 				}),
 				fillInIncompleteTokens,
 				codeBlockRendererSync: (languageId, text, raw) => {
+					const metadataForThisBlock = consumeCodeBlockMetadata();
 					const isCodeBlockComplete = !isResponseVM(context.element) || context.element.isComplete || !raw || codeblockHasClosingBackticks(raw);
-					if ((!text || (text.startsWith('<vscode_codeblock_uri') && !text.includes('\n'))) && !isCodeBlockComplete) {
+					if ((!text || !text.includes('\n')) && !isCodeBlockComplete) {
 						const hideEmptyCodeblock = $('div');
 						hideEmptyCodeblock.style.display = 'none';
 						return hideEmptyCodeblock;
@@ -181,15 +185,14 @@ export class ChatMarkdownContentPart extends Disposable implements IChatContentP
 						const match = raw.match(/^```diff:(\w+)/);
 						if (match && isResponseVM(context.element)) {
 							const actualLanguageId = match[1];
-							const codeBlockUri = extractCodeblockUrisFromText(text);
-							const { before, after } = parseUnifiedDiff(codeBlockUri?.textWithoutResult ?? text);
+							const { before, after } = parseUnifiedDiff(text);
 							const diffData: IMarkdownDiffBlockData = {
 								element: context.element,
 								codeBlockIndex: globalCodeBlockIndexStart++,
 								languageId: actualLanguageId,
 								beforeContent: before,
 								afterContent: after,
-								codeBlockResource: codeBlockUri?.uri,
+								codeBlockResource: metadataForThisBlock?.uri,
 								isReadOnly: true,
 								horizontalPadding: this.rendererOptions.horizontalPadding,
 							};
@@ -227,7 +230,7 @@ export class ChatMarkdownContentPart extends Disposable implements IChatContentP
 					} else {
 						if (isResponseVM(element) || isRequestVM(element)) {
 							const modelEntry = this.codeBlockModelCollection.getOrCreate(element.sessionResource, element, globalIndex);
-							const fastUpdateModelEntry = this.codeBlockModelCollection.updateSync(element.sessionResource, element, globalIndex, { text, languageId, isComplete: isCodeBlockComplete });
+							const fastUpdateModelEntry = this.codeBlockModelCollection.updateSync(element.sessionResource, element, globalIndex, { text, languageId, isComplete: isCodeBlockComplete, codeBlockMetadata: metadataForThisBlock });
 							vulns = modelEntry.vulns;
 							codeblockEntry = fastUpdateModelEntry;
 							textModel = modelEntry.model;
@@ -243,7 +246,7 @@ export class ChatMarkdownContentPart extends Disposable implements IChatContentP
 					if (hideToolbar !== undefined) {
 						renderOptions.hideToolbar = hideToolbar;
 					}
-					const codeBlockInfo: ICodeBlockData = { languageId, textModel, codeBlockIndex: globalIndex, codeBlockPartIndex: thisPartIndex, element, range, parentContextKeyService: contextKeyService, vulns, codemapperUri: codeblockEntry?.codemapperUri, renderOptions, chatSessionResource: element.sessionResource };
+					const codeBlockInfo: ICodeBlockData = { languageId, textModel, codeBlockIndex: globalIndex, codeBlockPartIndex: thisPartIndex, element, range, parentContextKeyService: contextKeyService, vulns, codemapperUri: codeblockEntry?.codemapperUri, renderOptions, chatSessionResource: element.sessionResource, codeBlockMetadata: metadataForThisBlock };
 
 					if (element.isCompleteAddedRequest || !codeblockEntry?.codemapperUri || !codeblockEntry.isEdit) {
 						const ref = this.renderCodeBlock(codeBlockInfo, text, isCodeBlockComplete, currentWidth);
@@ -281,7 +284,7 @@ export class ChatMarkdownContentPart extends Disposable implements IChatContentP
 						const ref = this.renderCodeBlockPill(element.sessionResource, requestId, inUndoStop, codeBlockInfo.codemapperUri, this.markdown.fromSubagent);
 						if (isResponseVM(codeBlockInfo.element)) {
 							// TODO@joyceerhl: remove this code when we change the codeblockUri API to make the URI available synchronously
-							this.codeBlockModelCollection.update(codeBlockInfo.element.sessionResource, codeBlockInfo.element, codeBlockInfo.codeBlockIndex, { text, languageId: codeBlockInfo.languageId, isComplete: isCodeBlockComplete }).then((e) => {
+							this.codeBlockModelCollection.update(codeBlockInfo.element.sessionResource, codeBlockInfo.element, codeBlockInfo.codeBlockIndex, { text, languageId: codeBlockInfo.languageId, isComplete: isCodeBlockComplete, codeBlockMetadata: codeBlockInfo.codeBlockMetadata }).then((e) => {
 								// Update the existing object's codemapperUri
 								this._codeblocks[codeBlockInfo.codeBlockPartIndex].codemapperUri = e.codemapperUri;
 								this._onDidChangeHeight.fire();
@@ -398,7 +401,7 @@ export class ChatMarkdownContentPart extends Disposable implements IChatContentP
 		const ref = this.editorPool.get();
 		const editorInfo = ref.object;
 		if (isResponseVM(data.element)) {
-			this.codeBlockModelCollection.update(data.element.sessionResource, data.element, data.codeBlockIndex, { text, languageId: data.languageId, isComplete }).then((e) => {
+			this.codeBlockModelCollection.update(data.element.sessionResource, data.element, data.codeBlockIndex, { text, languageId: data.languageId, isComplete, codeBlockMetadata: data.codeBlockMetadata }).then((e) => {
 				// Update the existing object's codemapperUri
 				this._codeblocks[data.codeBlockPartIndex].codemapperUri = e.codemapperUri;
 				this._onDidChangeHeight.fire();

@@ -14,7 +14,6 @@ import { IConfigurationService } from '../../../../../../platform/configuration/
 import { MarkdownString } from '../../../../../../base/common/htmlContent.js';
 import { IRenderedMarkdown } from '../../../../../../base/browser/markdownRenderer.js';
 import { IMarkdownRenderer } from '../../../../../../platform/markdown/browser/markdownRenderer.js';
-import { extractCodeblockUrisFromText } from '../../../common/widget/annotations.js';
 import { basename } from '../../../../../../base/common/resources.js';
 import { ChatCollapsibleContentPart } from './chatCollapsibleContentPart.js';
 import { localize } from '../../../../../../nls.js';
@@ -535,9 +534,9 @@ export class ChatThinkingContentPart extends ChatCollapsibleContentPart implemen
 
 				this.toolInvocations.push(toolInvocationOrMarkdown);
 			} else if (toolInvocationOrMarkdown?.kind === 'markdownContent') {
-				const codeblockInfo = extractCodeblockUrisFromText(toolInvocationOrMarkdown.content.value);
-				if (codeblockInfo?.uri) {
-					const filename = basename(codeblockInfo.uri);
+				const metadata = toolInvocationOrMarkdown.codeBlockMetadata?.[0];
+				if (metadata?.uri) {
+					const filename = basename(metadata.uri);
 					toolCallLabel = localize('chat.thinking.editedFile', 'Edited {0}', filename);
 				} else {
 					toolCallLabel = localize('chat.thinking.editingFile', 'Edited file');
