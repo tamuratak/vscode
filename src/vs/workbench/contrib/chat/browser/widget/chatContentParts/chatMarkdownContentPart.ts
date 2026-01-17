@@ -397,7 +397,7 @@ export class ChatMarkdownContentPart extends Disposable implements IChatContentP
 	private renderCodeBlock(data: ICodeBlockData, text: string, isComplete: boolean, currentWidth: number): IDisposableReference<CodeBlockPart> {
 		const ref = this.editorPool.get();
 		const editorInfo = ref.object;
-		if (isResponseVM(data.element)) {
+		if (isResponseVM(data.element) || isRequestVM(data.element)) {
 			this.codeBlockModelCollection.update(data.element.sessionResource, data.element, data.codeBlockIndex, { text, languageId: data.languageId, isComplete }).then((e) => {
 				// Update the existing object's codemapperUri
 				this._codeblocks[data.codeBlockPartIndex].codemapperUri = e.codemapperUri;
