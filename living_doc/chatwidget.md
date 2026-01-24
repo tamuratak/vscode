@@ -1,11 +1,12 @@
 # Chat View Overview
 
-- ChatWidget の createList で ChatListItemRenderer が生成される. 他色々.
--
+- ChatWidget の `createList` で `ChatListWidget` を作成し、ツリー/レンダリングまわりの責務をそちらに委譲するようになった。
+- `ChatListWidget` が `WorkbenchObjectTree`＋`ChatListItemRenderer` を含み、スクロール制御、コンテキストメニュー、フォローアップなどのイベントをまとめて公開する。
+
 
 ## ChatWidget から ListView への経路
 
-`ChatWidget` の `createList` から `WorkbenchObjectTree` を生成し、レンダラー／デリゲート／コンテナを渡してツリー UI を組み立てる。
+`ChatWidget` の `createList` から `ChatListWidget` を生成し、その内部で `WorkbenchObjectTree` にレンダラー／デリゲート／コンテナを渡してツリー UI を組み立てる。
 
 ```mermaid
 classDiagram
@@ -18,6 +19,12 @@ class ChatWidget {
   -onDidChangeItems()
 }
 
+class ChatListWidget {
+  WorkbenchObjectTree tree
+  ChatListItemRenderer renderer
+  +refresh()
+  +setScrollLock()
+}
 class WorkbenchObjectTree
 class ObjectTree {
   IObjectTreeModel model
@@ -32,6 +39,8 @@ class List {
 }
 interface IListView
 
+ChatWidget --> ChatListWidget
+ChatListWidget --> WorkbenchObjectTree
 AbstractTree <|-- ObjectTree
 ObjectTree <|-- WorkbenchObjectTree
 List <|-- TreeNodeList
@@ -40,7 +49,14 @@ List <|-- TreeNodeList
 
 ## ListView の items は chatWidget からどのような経路で変更されるか
 
-ChatWidget 側では `viewModel` から `treeItems` を作って `ChatWidget.tree.setChildren(null, treeItems, …)`
+ChatWidget 側では `viewModel` から `ChatListWidget.refresh()` を呼び出し、`ChatListWidget` が `WorkbenchObjectTree` に渡す `ITreeElement<ChatTreeItem>` を構成して `setChildren(null, treeItems, …)` を実行する。
+イメージは `ChatListWidget#refresh()` に沿って `treeItems` を作り、`_withPersistedAutoScroll` を挟んだ上で `diffIdentityProvider` 付きで `WorkbenchObjectTree.setChildren` を呼び出し、表示中に再描画が必要な条件（progressive render、content references、undo/redo、checkpointing）を ID に乗せて差分化する。
+
+## ChatListWidget の役割
+
+- `ChatListWidget` は `IChatListWidgetOptions` を使って `ChatListItemRenderer` を準備し、`WorkbenchObjectTree` を構成する再利用可能なウィジェット。`ChatWidget` の `createList` はこのクラスを生成して `refresh()`/`setViewModel()`/`setScrollLock()` で描画を操作する。
+- `_withPersistedAutoScroll`/`setScrollLock` で末尾への追従を維持しつつ、スクロール位置が乱れないようにする。`ChatWidget` は可視化のたびに `setVisible`/`layout`/`scrollToEnd` を呼び出すことで、`WorkbenchObjectTree` とレンダラー双方に命令を伝える。
+- `ChatListWidget` 内で scroll-down ボタン、ChatContextKeys.lastItemId の更新、rerun-with-agent 構成 (`onDidClickRerunWithAgentOrCommandDetection`)、KaTeX などのコンテキストメニュー判定、フォローアップや高さ変化イベントの公開が行われているので、`ChatWidget` はこれらのイベントを高レベルにまとめるだけで済むようになっている。
 
 ## renderer と templateDate
 
@@ -68,9 +84,16 @@ sequenceDiagram
     R->>MAP: delete templateDataByRequestId[id]
 ```
 
+## ChatListItemRenderer の最近の改良
+
+- 渡された `templateData` の行高さを `ResizeObserver` で監視し、`onDidChangeItemHeight` を源に `_updateElementHeight` を吐くようになったため、レンダラー側で `updateItemHeightOnRender` を呼ぶ必要がなくなった。`ChatListWidget` はこのイベントを拾って `WorkbenchObjectTree.updateElementHeight` をトリガーする。[src/vs/workbench/contrib/chat/browser/widget/chatListRenderer.ts](src/vs/workbench/contrib/chat/browser/widget/chatListRenderer.ts)
+- 小分け表示の Thinking パートが強化され、`shouldPinPart` のロジックにMermaid/terminal/subagent判定、`ChatThinkingContentPart` の遅延レンダリング（`setupConfirmationTransitionWatcher`）が追加。ツールや Markdown が `ChatThinkingContentPart` にまとめられる一方、`ChatSubagentContentPart` で `runSubagent` を境に工具をグループ化する仕組みも導入され、複雑なサブエージェント構成に対応する。
+- `ChatQuestionCarouselPart` を直接レンダリングし、`pendingQuestionCarousels` で送信前に未回答カルーセルを自動スキップ。`onDidClickRerunWithAgentOrCommandDetection` から再送処理も統合されるようになった。
+- Markdown コードブロックの pin 制御や tooltip などの改善に加えて、`ChatWorkspaceEditContentPart`／`ChatMultiDiffContentPart`／`ChatTreeContentPart` がそれぞれ能動的に高さ変更イベントを発火しなくなり、`ListView` 側の `ResizeObserver` だけで高さを追跡する構成に移行した。
+
 ## templateData のながれ
 
-- ChatWidget が `viewModel.getItems()` で `ChatTreeItem` のリストを作り、`this.tree.setChildren(null, treeItems, …)` で `WorkbenchObjectTree` に渡すところから描画が始まります。ここで “差分の ID を設定したツリー要素” を `ObjectTree` に流しているので、新規要素／更新要素がモデルに登録され、リストの再レンダリングがトリガーされます。[chatWidget.ts#L804-L859](src/vs/workbench/contrib/chat/browser/chatWidget.ts#L804-L859)
+- ChatWidget が `viewModel.getItems()` で `ChatTreeItem` のリストを作り、まず `ChatListWidget.refresh()` を呼んで `WorkbenchObjectTree` に渡す `treeItems` を組み立てることから描画が始まります。`ChatListWidget` 内部では `_withPersistedAutoScroll` を使ってスクロール位置を保ちつつ `setChildren(null, treeItems, …)` を呼ぶので、表示中の再描画が必要な要素を差分 ID に乗せられます。[chatWidget.ts#L804-L859](src/vs/workbench/contrib/chat/browser/chatWidget.ts#L804-L859)
 - `ObjectTree.setChildren` は単にモデルに委譲するだけなので、その段階では `ObjectTreeModel` が新しい要素群を記録します。[objectTree.ts#L40-L86](src/vs/base/browser/ui/tree/objectTree.ts#L40-L86)
 - `AbstractTree` の `setupModel` がそのモデルの `onDidSpliceRenderedNodes` を監視し、差分イベントを `view.splice`（= `TreeNodeList.splice`）に渡します。`TreeNodeList` は `List` サブクラスで、差分を `super.splice` 経由で `ListView.splice` まで流し、フォーカス/選択の Trait も更新します。[abstractTree.ts#L2474-L2538](src/vs/base/browser/ui/tree/abstractTree.ts#L2474-L2538)／[abstractTree.ts#L3199-L3242](src/vs/base/browser/ui/tree/abstractTree.ts#L3199-L3242)
 - `ListView` は `items: IItem<T>[]` という配列で現在の DOM 行を管理し、`splice` → `_splice` で差分を反映します。新しい要素を挿入するたびに `virtualDelegate.getTemplateId` で renderer を決め、`row.templateData` を保持した `IRow` を再利用しながら DOM を差し替えます。また `_splice` 中で既存 `row.templateData` を `renderer.disposeElement` に渡して解放する仕組みにより、テンプレート情報を `ListView` が握りながら renderer に受け渡し続けます。[listView.ts#L290-L340](src/vs/base/browser/ui/list/listView.ts#L290-L340)／[listView.ts#L617-L700](src/vs/base/browser/ui/list/listView.ts#L617-L700)
@@ -81,6 +104,7 @@ sequenceDiagram
 sequenceDiagram
     %% Participants representing the components in the flow
     participant CW as ChatWidget
+    participant CLW as ChatListWidget
     participant WOT as WorkbenchObjectTree
     participant OTM as ObjectTreeModel
     participant AT as AbstractTree
@@ -88,8 +112,8 @@ sequenceDiagram
     participant LV as ListView
     participant R as ChatListItemRenderer
 
-
-    CW->>WOT: viewModel.getItems()
+    CW->>CLW: refresh()
+    CLW->>WOT: setChildren()
     WOT->>OTM: setChildren()
     OTM->>AT: onDidSpliceRenderedNodes()
     AT->>TNL: TreeNodeList.splice
