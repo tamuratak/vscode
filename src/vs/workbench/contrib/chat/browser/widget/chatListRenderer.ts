@@ -1934,7 +1934,7 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 
 	private renderMarkdown(markdown: IChatMarkdownContent, templateData: IChatListItemTemplate, context: IChatContentPartRenderContext): IChatContentPart {
 		const element = context.element;
-		const isFinalAnswerPart = isResponseVM(element) && element.isComplete && context.contentIndex === context.content.length - 1;
+		const isFinalAnswerPart = isResponseVM(element) && element.isComplete && !this.hasFollowingMarkdownContent(context);
 		if (!this.hasCodeblockUri(markdown) || isFinalAnswerPart) {
 			this.finalizeCurrentThinkingPart(context, templateData);
 		}
@@ -2046,6 +2046,16 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 		}
 
 		return markdownPart;
+	}
+
+	private hasFollowingMarkdownContent(context: IChatContentPartRenderContext): boolean {
+		for (let i = context.contentIndex + 1; i < context.content.length; i++) {
+			const part = context.content[i];
+			if (part.kind === 'markdownContent' && part.content.value.trim().length > 0) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	renderThinkingPart(content: IChatThinkingPart, context: IChatContentPartRenderContext, templateData: IChatListItemTemplate): IChatContentPart {
