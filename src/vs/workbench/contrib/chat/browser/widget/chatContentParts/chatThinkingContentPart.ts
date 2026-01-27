@@ -9,7 +9,7 @@ import { DomScrollableElement } from '../../../../../../base/browser/ui/scrollba
 import { ScrollbarVisibility } from '../../../../../../base/common/scrollable.js';
 import { IChatMarkdownContent, IChatThinkingPart, IChatToolInvocation, IChatToolInvocationSerialized } from '../../../common/chatService/chatService.js';
 import { IChatContentPartRenderContext, IChatContentPart } from './chatContentParts.js';
-import { IChatRendererContent } from '../../../common/model/chatViewModel.js';
+import { IChatRendererContent, isResponseVM } from '../../../common/model/chatViewModel.js';
 import { ChatConfiguration, ThinkingDisplayMode } from '../../../common/constants.js';
 import { ChatTreeItem } from '../../chat.js';
 import { IInstantiationService } from '../../../../../../platform/instantiation/common/instantiation.js';
@@ -1110,8 +1110,15 @@ export class ChatThinkingContentPart extends ChatCollapsibleContentPart implemen
 		this.setTitleWithWidgets(new MarkdownString(thinkingLabel), this.instantiationService, this.chatMarkdownAnchorService, this.chatContentMarkdownRenderer);
 	}
 
-	hasSameContent(other: IChatRendererContent, _followingContent: IChatRendererContent[], _element: ChatTreeItem): boolean {
-		if (other.kind === 'toolInvocation' || other.kind === 'toolInvocationSerialized' || other.kind === 'markdownContent') {
+	hasSameContent(other: IChatRendererContent, _followingContent: IChatRendererContent[], element: ChatTreeItem): boolean {
+		if (other.kind === 'markdownContent') {
+			if (isResponseVM(element) && element.isComplete) {
+				return false;
+			}
+			return true;
+		}
+
+		if (other.kind === 'toolInvocation' || other.kind === 'toolInvocationSerialized') {
 			return true;
 		}
 
