@@ -1248,6 +1248,7 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 			partsToRender.push(fileChangesSummaryPart);
 		}
 
+		moreContentAvailable = moreContentAvailable || !element.isComplete;
 		return { content: partsToRender, moreContentAvailable };
 	}
 
