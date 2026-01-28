@@ -45,6 +45,7 @@ export interface IChatContentPartRenderContext {
 	readonly elementIndex: number;
 	readonly container: HTMLElement;
 	readonly content: ReadonlyArray<IChatRendererContent>;
+	readonly moreContentAvailable: boolean;
 	readonly contentIndex: number;
 	readonly editorPool: EditorPool;
 	readonly codeBlockStartIndex: number;

@@ -848,7 +848,7 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 		}
 
 		const diff = this.diff(templateData.renderedParts ?? [], content, element);
-		this.renderChatContentDiff(diff, content, element, index, templateData);
+		this.renderChatContentDiff(diff, content, false, element, index, templateData);
 	}
 
 	private shouldShowWorkingProgress(element: IChatResponseViewModel, partsToRender: IChatRendererContent[], templateData: IChatListItemTemplate): boolean {
@@ -969,6 +969,7 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 				elementIndex: index,
 				contentIndex: contentIndex,
 				content: content,
+				moreContentAvailable: false,
 				container: templateData.rowContainer,
 				editorPool: this._editorPool,
 				diffEditorPool: this._diffEditorPool,
@@ -1062,12 +1063,12 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 
 		// Do an actual progressive render
 		this.traceLayout('doNextProgressiveRender', `doing progressive render, ${partsToRender.length} parts to render`);
-		this.renderChatContentDiff(partsToRender, contentForThisTurn.content, element, index, templateData);
+		this.renderChatContentDiff(partsToRender, contentForThisTurn.content, contentForThisTurn.moreContentAvailable, element, index, templateData);
 
 		return false;
 	}
 
-	private renderChatContentDiff(partsToRender: ReadonlyArray<IChatRendererContent | null>, contentForThisTurn: ReadonlyArray<IChatRendererContent>, element: IChatResponseViewModel, elementIndex: number, templateData: IChatListItemTemplate): void {
+	private renderChatContentDiff(partsToRender: ReadonlyArray<IChatRendererContent | null>, contentForThisTurn: ReadonlyArray<IChatRendererContent>, moreContentAvailable: boolean, element: IChatResponseViewModel, elementIndex: number, templateData: IChatListItemTemplate): void {
 		const renderedParts = templateData.renderedParts ?? [];
 		templateData.renderedParts = renderedParts;
 		partsToRender.forEach((partToRender, contentIndex) => {
@@ -1103,6 +1104,7 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 				element,
 				elementIndex: elementIndex,
 				content: contentForThisTurn,
+				moreContentAvailable: moreContentAvailable,
 				contentIndex: contentIndex,
 				container: templateData.rowContainer,
 				editorPool: this._editorPool,
@@ -1952,7 +1954,7 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 
 	private renderMarkdown(markdown: IChatMarkdownContent, templateData: IChatListItemTemplate, context: IChatContentPartRenderContext): IChatContentPart {
 		const element = context.element;
-		const isFinalAnswerPart = isResponseVM(element) && element.isComplete && context.contentIndex === context.content.length - 1;
+		const isFinalAnswerPart = isResponseVM(element) && context.contentIndex === context.content.length - 1 && (!context.moreContentAvailable || element.isComplete);
 		if (!this.hasCodeblockUri(markdown) || isFinalAnswerPart) {
 			this.finalizeCurrentThinkingPart(context, templateData);
 		}

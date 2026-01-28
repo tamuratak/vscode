@@ -56,6 +56,7 @@ suite('ChatSubagentContentPart', () => {
 			elementIndex: 0,
 			container: mainWindow.document.createElement('div'),
 			content: [],
+			moreContentAvailable: false,
 			contentIndex: 0,
 			editorPool: mockEditorPool,
 			codeBlockStartIndex: 0,
