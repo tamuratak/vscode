@@ -2072,10 +2072,11 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 		if (!isResponseVM(context.element)) {
 			return false;
 		}
+		if (context.moreContentAvailable && !context.element.isComplete) {
+			return false;
+		}
 		const lastRenderableIndex = this.getLastRenderableContentIndex(context.content, context.contentIndex);
-		return lastRenderableIndex >= 0
-			&& context.contentIndex === lastRenderableIndex
-			&& (!context.moreContentAvailable || context.element.isComplete);
+		return lastRenderableIndex >= 0 && context.contentIndex === lastRenderableIndex;
 	}
 
 	private getLastRenderableContentIndex(content: ReadonlyArray<IChatRendererContent>, contentIndex: number): number {
