@@ -1243,7 +1243,6 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 			partsToRender.push(fileChangesSummaryPart);
 		}
 
-		moreContentAvailable = moreContentAvailable || !element.isComplete;
 		return { content: partsToRender, moreContentAvailable };
 	}
 
@@ -1955,7 +1954,7 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 
 	private renderMarkdown(markdown: IChatMarkdownContent, templateData: IChatListItemTemplate, context: IChatContentPartRenderContext): IChatContentPart {
 		const element = context.element;
-		const isFinalAnswerPart = isResponseVM(element) && context.contentIndex === context.content.length - 1 && (!context.moreContentAvailable || element.isComplete);
+		const isFinalAnswerPart = this.isFinalActualResponsePart(context);
 		if (!this.hasCodeblockUri(markdown) || isFinalAnswerPart) {
 			this.finalizeCurrentThinkingPart(context, templateData);
 		}
@@ -2067,6 +2066,29 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 		}
 
 		return markdownPart;
+	}
+
+	private isFinalActualResponsePart(context: IChatContentPartRenderContext): boolean {
+		if (!isResponseVM(context.element)) {
+			return false;
+		}
+		const lastRenderableIndex = this.getLastRenderableContentIndex(context.content, context.contentIndex);
+		return lastRenderableIndex >= 0
+			&& context.contentIndex === lastRenderableIndex
+			&& (!context.moreContentAvailable || context.element.isComplete);
+	}
+
+	private getLastRenderableContentIndex(content: ReadonlyArray<IChatRendererContent>, contentIndex: number): number {
+		for (let i = content.length - 1; i >= contentIndex; i--) {
+			if (!this.isTrailingMetadataContent(content[i])) {
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	private isTrailingMetadataContent(content: IChatRendererContent): boolean {
+		return content.kind === 'working' || content.kind === 'changesSummary';
 	}
 
 	renderThinkingPart(content: IChatThinkingPart, context: IChatContentPartRenderContext, templateData: IChatListItemTemplate): IChatContentPart {
