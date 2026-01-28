@@ -53,6 +53,7 @@ suite('ChatThinkingContentPart', () => {
 			elementIndex: 0,
 			container: mainWindow.document.createElement('div'),
 			content: [],
+			moreContentAvailable: false,
 			contentIndex: 0,
 			editorPool: {} as EditorPool,
 			codeBlockStartIndex: 0,
