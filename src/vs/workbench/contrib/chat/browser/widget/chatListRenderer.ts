@@ -1970,10 +1970,7 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 
 	private renderMarkdown(markdown: IChatMarkdownContent, templateData: IChatListItemTemplate, context: IChatContentPartRenderContext): IChatContentPart {
 		const element = context.element;
-		let isFinalAnswerPart = false;
-		if (isResponseVM(element)) {
-			isFinalAnswerPart = context.contentIndex === context.content.length - 1 && this.isResponseStreamFinal(element);
-		}
+		const isFinalAnswerPart = isResponseVM(element) && context.contentIndex === context.content.length - 1 && !context.moreContentAvailable && this.isResponseStreamFinal(element);
 		if (!this.hasCodeblockUri(markdown) || isFinalAnswerPart) {
 			this.finalizeCurrentThinkingPart(context, templateData);
 		}
