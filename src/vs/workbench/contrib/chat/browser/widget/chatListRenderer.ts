@@ -141,6 +141,12 @@ export interface IChatListItemTemplate {
 	readonly checkpointRestoreContainer: HTMLElement;
 }
 
+interface IChatRendererContentMetadata {
+	hasCodeblockUri?: boolean;
+	shouldPinForTool?: boolean;
+	isFinalMarkdown?: boolean;
+}
+
 interface IItemHeightChangeParams {
 	element: ChatTreeItem;
 	height: number;
@@ -205,6 +211,7 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 	private readonly _diffEditorPool: DiffEditorPool;
 	private readonly _treePool: TreePool;
 	private readonly _contentReferencesListPool: CollapsibleListPool;
+	private readonly contentMetadata = new WeakMap<IChatRendererContent, IChatRendererContentMetadata>();
 
 	private _currentLayoutWidth = observableValue(this, 0);
 	private _isVisible = true;
@@ -852,8 +859,38 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 			content.push(fileChangesSummaryPart);
 		}
 
+		this.updateContentMetadata(content, element);
+
 		const diff = this.diff(templateData.renderedParts ?? [], content, element);
 		this.renderChatContentDiff(diff, content, element, index, templateData);
+	}
+
+	private updateContentMetadata(content: IChatRendererContent[], element: IChatResponseViewModel): void {
+		let lastMarkdownIndex = -1;
+		for (let i = content.length - 1; i >= 0; i--) {
+			if (content[i].kind === 'markdownContent') {
+				lastMarkdownIndex = i;
+				break;
+			}
+		}
+
+		for (let i = 0; i < content.length; i++) {
+			const part = content[i];
+			if (part.kind !== 'markdownContent') {
+				continue;
+			}
+
+			let metadata = this.contentMetadata.get(part);
+			if (!metadata) {
+				metadata = {};
+			}
+			const containsCodeblockUri = hasCodeblockUriTag(part.content.value);
+			const isFinalMarkdownPart = element.isComplete && i === lastMarkdownIndex;
+			metadata.hasCodeblockUri = containsCodeblockUri;
+			metadata.shouldPinForTool = containsCodeblockUri && !isFinalMarkdownPart;
+			metadata.isFinalMarkdown = isFinalMarkdownPart;
+			this.contentMetadata.set(part, metadata);
+		}
 	}
 
 	private shouldShowWorkingProgress(element: IChatResponseViewModel, partsToRender: IChatRendererContent[], templateData: IChatListItemTemplate): boolean {
@@ -1300,13 +1337,6 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 		return diff;
 	}
 
-	private hasCodeblockUri(part: IChatRendererContent): boolean {
-		if (part.kind !== 'markdownContent') {
-			return false;
-		}
-		return hasCodeblockUriTag(part.content.value);
-	}
-
 	private isCodeblockComplete(part: IChatRendererContent, element: ChatTreeItem): boolean {
 		if (part.kind !== 'markdownContent') {
 			return true;
@@ -1332,7 +1362,11 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 		}
 
 		// is an edit related part
-		if (this.hasCodeblockUri(part) || part.kind === 'textEditGroup') {
+		if (part.kind === 'textEditGroup') {
+			return true;
+		}
+		const metadata = this.contentMetadata.get(part);
+		if (metadata?.shouldPinForTool) {
 			return true;
 		}
 
@@ -1969,7 +2003,12 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 	private renderMarkdown(markdown: IChatMarkdownContent, templateData: IChatListItemTemplate, context: IChatContentPartRenderContext): IChatContentPart {
 		const element = context.element;
 		const isFinalAnswerPart = isResponseVM(element) && element.isComplete && context.contentIndex === context.content.length - 1;
-		if (!this.hasCodeblockUri(markdown) || isFinalAnswerPart) {
+		const metadata = this.contentMetadata.get(markdown);
+		const shouldFinalizeThinkingPart =
+			!metadata?.hasCodeblockUri ||
+			isFinalAnswerPart ||
+			(!!metadata?.isFinalMarkdown && isResponseVM(element) && element.isComplete);
+		if (shouldFinalizeThinkingPart) {
 			this.finalizeCurrentThinkingPart(context, templateData);
 		}
 		const fillInIncompleteTokens = isResponseVM(element) && (!element.isComplete || element.isCanceled || element.errorDetails?.responseIsFiltered || element.errorDetails?.responseIsIncomplete || !!element.renderData);
