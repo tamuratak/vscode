@@ -1283,6 +1283,8 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 			partsToRender.push(fileChangesSummaryPart);
 		}
 
+		this.updateContentMetadata(partsToRender, element);
+
 		return { content: partsToRender, moreContentAvailable };
 	}
 
