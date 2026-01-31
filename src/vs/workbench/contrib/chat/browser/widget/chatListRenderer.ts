@@ -2004,13 +2004,9 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 
 	private renderMarkdown(markdown: IChatMarkdownContent, templateData: IChatListItemTemplate, context: IChatContentPartRenderContext): IChatContentPart {
 		const element = context.element;
-		const isFinalAnswerPart = isResponseVM(element) && element.isComplete && context.contentIndex === context.content.length - 1;
 		const metadata = this.contentMetadata.get(markdown);
-		const shouldFinalizeThinkingPart =
-			!metadata?.hasCodeblockUri ||
-			isFinalAnswerPart ||
-			(!!metadata?.isFinalMarkdown && isResponseVM(element) && element.isComplete);
-		if (shouldFinalizeThinkingPart) {
+		const isFinalAnswerPart = isResponseVM(element) && element.isComplete && (context.contentIndex === context.content.length - 1 || metadata?.isFinalMarkdown);
+		if (!metadata?.hasCodeblockUri || isFinalAnswerPart) {
 			this.finalizeCurrentThinkingPart(context, templateData);
 		}
 		const fillInIncompleteTokens = isResponseVM(element) && (!element.isComplete || element.isCanceled || element.errorDetails?.responseIsFiltered || element.errorDetails?.responseIsIncomplete || !!element.renderData);
