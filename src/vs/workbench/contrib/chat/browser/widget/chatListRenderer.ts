@@ -1215,6 +1215,7 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 					return preceedingContentParts.filter(part => part instanceof ChatTreeContentPart).length;
 				}
 			};
+			const contextElementForPinning = isResponseVM(context.element) ? context.element : undefined;
 
 			// combine tool invocations into thinking part if needed. render the tool, but do not replace the working spinner with the new part's dom node since it is already inside the thinking part.
 			const lastThinking = this.getLastThinkingPart(renderedParts);
@@ -1229,12 +1230,20 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 				return;
 			}
 
+			const shouldPinNow = this.shouldPinPart(partToRender, contextElementForPinning);
+			const wasPinned = this.isRenderedPartInsideThinking(alreadyRenderedPart);
+			const needsReposition = wasPinned && !shouldPinNow;
+			const thinkingWrapper = needsReposition && alreadyRenderedPart?.domNode ? dom.findParentWithClass(alreadyRenderedPart.domNode, 'chat-thinking-tool-wrapper') as HTMLElement | null : undefined;
+
 			const newPart = this.renderChatContentPart(partToRender, templateData, context);
 			if (newPart) {
 				renderedParts[contentIndex] = newPart;
+				if (thinkingWrapper) {
+					thinkingWrapper.remove();
+				}
 				// Maybe the part can't be rendered in this context, but this shouldn't really happen
 				try {
-					if (alreadyRenderedPart?.domNode) {
+					if (!needsReposition && alreadyRenderedPart?.domNode) {
 						if (newPart.domNode) {
 							alreadyRenderedPart.domNode.replaceWith(newPart.domNode);
 						} else {
@@ -1378,9 +1387,16 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 
 	private diff(renderedParts: ReadonlyArray<IChatContentPart>, contentToRender: ReadonlyArray<IChatRendererContent>, element: ChatTreeItem): ReadonlyArray<IChatRendererContent | null> {
 		const diff: (IChatRendererContent | null)[] = [];
+		const isResponseElement = isResponseVM(element);
+		const elementIsComplete = isResponseElement && element.isComplete;
 		for (let i = 0; i < contentToRender.length; i++) {
 			const content = contentToRender[i];
 			const renderedPart = renderedParts[i];
+
+			if (elementIsComplete && this.isRenderedPartInsideThinking(renderedPart)) {
+				diff.push(content);
+				continue;
+			}
 
 			if (!renderedPart || !renderedPart.hasSameContent(content, contentToRender.slice(i + 1), element)) {
 				diff.push(content);
@@ -1391,6 +1407,13 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 		}
 
 		return diff;
+	}
+
+	private isRenderedPartInsideThinking(renderedPart: IChatContentPart | undefined): boolean {
+		if (!renderedPart?.domNode) {
+			return false;
+		}
+		return !!dom.findParentWithClass(renderedPart.domNode, 'chat-thinking-box');
 	}
 
 	private hasCodeblockUri(part: IChatRendererContent): boolean {
@@ -1409,6 +1432,9 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 
 	private shouldPinPart(part: IChatRendererContent, element?: IChatResponseViewModel): boolean {
 		const collapsedToolsMode = this.configService.getValue<CollapsedToolsDisplayMode>('chat.agent.thinking.collapsedTools');
+		if (element?.isComplete) {
+			return false;
+		}
 
 		// thinking and working content are always pinned (they are the thinking container itself)
 		if (part.kind === 'thinking' || part.kind === 'working') {
