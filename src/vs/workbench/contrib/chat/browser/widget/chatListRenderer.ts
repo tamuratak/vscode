@@ -1215,7 +1215,6 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 					return preceedingContentParts.filter(part => part instanceof ChatTreeContentPart).length;
 				}
 			};
-			const contextElementForPinning = isResponseVM(context.element) ? context.element : undefined;
 
 			// combine tool invocations into thinking part if needed. render the tool, but do not replace the working spinner with the new part's dom node since it is already inside the thinking part.
 			const lastThinking = this.getLastThinkingPart(renderedParts);
@@ -1230,20 +1229,12 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 				return;
 			}
 
-			const shouldPinNow = this.shouldPinPart(partToRender, contextElementForPinning);
-			const wasPinned = this.isRenderedPartInsideThinking(alreadyRenderedPart);
-			const needsReposition = wasPinned && !shouldPinNow;
-			const thinkingWrapper = needsReposition && alreadyRenderedPart?.domNode ? dom.findParentWithClass(alreadyRenderedPart.domNode, 'chat-thinking-tool-wrapper') as HTMLElement | null : undefined;
-
 			const newPart = this.renderChatContentPart(partToRender, templateData, context);
 			if (newPart) {
 				renderedParts[contentIndex] = newPart;
-				if (thinkingWrapper) {
-					thinkingWrapper.remove();
-				}
 				// Maybe the part can't be rendered in this context, but this shouldn't really happen
 				try {
-					if (!needsReposition && alreadyRenderedPart?.domNode) {
+					if (alreadyRenderedPart?.domNode) {
 						if (newPart.domNode) {
 							alreadyRenderedPart.domNode.replaceWith(newPart.domNode);
 						} else {
@@ -1388,11 +1379,12 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 	private diff(renderedParts: ReadonlyArray<IChatContentPart>, contentToRender: ReadonlyArray<IChatRendererContent>, element: ChatTreeItem): ReadonlyArray<IChatRendererContent | null> {
 		const diff: (IChatRendererContent | null)[] = [];
 		const elementIsComplete = isResponseVM(element) && element.isComplete;
+		const lastMarkdownContentIndex = contentToRender.findLastIndex(part => part.kind === 'markdownContent');
 		for (let i = 0; i < contentToRender.length; i++) {
 			const content = contentToRender[i];
 			const renderedPart = renderedParts[i];
 
-			if (elementIsComplete && this.isRenderedPartInsideThinking(renderedPart)) {
+			if (elementIsComplete && this.isRenderedPartInsideThinking(renderedPart) && content.kind === 'markdownContent' && i === lastMarkdownContentIndex) {
 				diff.push(content);
 				continue;
 			}
