@@ -1387,8 +1387,7 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 
 	private diff(renderedParts: ReadonlyArray<IChatContentPart>, contentToRender: ReadonlyArray<IChatRendererContent>, element: ChatTreeItem): ReadonlyArray<IChatRendererContent | null> {
 		const diff: (IChatRendererContent | null)[] = [];
-		const isResponseElement = isResponseVM(element);
-		const elementIsComplete = isResponseElement && element.isComplete;
+		const elementIsComplete = isResponseVM(element) && element.isComplete;
 		for (let i = 0; i < contentToRender.length; i++) {
 			const content = contentToRender[i];
 			const renderedPart = renderedParts[i];
@@ -1432,9 +1431,6 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 
 	private shouldPinPart(part: IChatRendererContent, element?: IChatResponseViewModel): boolean {
 		const collapsedToolsMode = this.configService.getValue<CollapsedToolsDisplayMode>('chat.agent.thinking.collapsedTools');
-		if (element?.isComplete) {
-			return false;
-		}
 
 		// thinking and working content are always pinned (they are the thinking container itself)
 		if (part.kind === 'thinking' || part.kind === 'working') {
@@ -1451,7 +1447,7 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 		}
 
 		// is an edit related part
-		if (this.hasCodeblockUri(part) || part.kind === 'textEditGroup') {
+		if ((this.hasCodeblockUri(part) && !element?.isComplete) || part.kind === 'textEditGroup') {
 			return true;
 		}
 
