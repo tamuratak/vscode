@@ -9,6 +9,7 @@ import { ITreeNode } from '../../../../../../base/browser/ui/tree/tree.js';
 import { Event } from '../../../../../../base/common/event.js';
 import { toDisposable } from '../../../../../../base/common/lifecycle.js';
 import { FuzzyScore } from '../../../../../../base/common/filters.js';
+import { MarkdownString } from '../../../../../../base/common/htmlContent.js';
 import { observableValue } from '../../../../../../base/common/observable.js';
 import { URI } from '../../../../../../base/common/uri.js';
 import { assertSnapshot } from '../../../../../../base/test/common/snapshot.js';
@@ -22,8 +23,8 @@ import { CodeBlockModelCollection } from '../../../common/widget/codeBlockModelC
 import { ChatTreeItem, IChatListItemRendererOptions } from '../../../browser/chat.js';
 import { IChatRequestVariableEntry } from '../../../common/attachments/chatVariableEntries.js';
 import { IChatPendingDividerViewModel, IChatRequestViewModel, IChatResponseViewModel, IChatViewModel } from '../../../common/model/chatViewModel.js';
-import { ChatModeKind } from '../../../common/constants.js';
-import { ChatRequestQueueKind, IChatService } from '../../../common/chatService/chatService.js';
+import { ChatModeKind, CollapsedToolsDisplayMode, ThinkingDisplayMode } from '../../../common/constants.js';
+import { ChatRequestQueueKind, IChatMarkdownContent, IChatService, IChatThinkingPart } from '../../../common/chatService/chatService.js';
 import { IResponse } from '../../../common/model/chatModel.js';
 import { IParsedChatRequest } from '../../../common/requestParser/chatParserTypes.js';
 import { MockChatService } from '../../common/chatService/mockChatService.js';
@@ -184,6 +185,23 @@ suite('ChatListItemRenderer', () => {
 			shouldBeBlocked: observableValue('shouldBeBlocked', false),
 			...options,
 		};
+	}
+
+	function createResponseWithParts(parts: ReadonlyArray<IChatMarkdownContent | IChatThinkingPart>): IChatResponseViewModel {
+		const response: IResponse = {
+			value: parts,
+			getMarkdown: () => '',
+			toString: () => ''
+		};
+
+		return createResponse({
+			response,
+			model: {
+				response,
+				entireResponse: response
+			} as IChatResponseViewModel['model'],
+			isComplete: true
+		});
 	}
 
 	setup(() => {
@@ -431,5 +449,80 @@ suite('ChatListItemRenderer', () => {
 
 		assert.ok(!template.footerDetailsContainer.classList.contains('hidden'));
 		assert.strictEqual(template.footerDetailsContainer.textContent, 'Processed 3 files');
+	});
+
+	test('final markdown renders outside thinking', async () => {
+		await configurationService.setUserConfiguration('chat.agent.thinking.collapsedTools', CollapsedToolsDisplayMode.Always);
+		await configurationService.setUserConfiguration('chat.agent.thinkingStyle', ThinkingDisplayMode.CollapsedPreview);
+
+		const template = renderer.renderTemplate(container);
+		store.add(template.templateDisposables);
+		store.add(toDisposable(() => renderer.disposeTemplate(template)));
+
+		const thinking: IChatThinkingPart = { kind: 'thinking', value: 'Thinking...' };
+		const finalMarkdown: IChatMarkdownContent = { kind: 'markdownContent', content: new MarkdownString('Final answer.') };
+		const element = createResponseWithParts([thinking, finalMarkdown]);
+
+		renderer.renderElement({ element } as ITreeNode<ChatTreeItem, FuzzyScore>, 0, template);
+
+		const thinkingBox = template.value.querySelector('.chat-thinking-box');
+		assert.ok(thinkingBox);
+
+		const markdownParts = Array.from(template.value.querySelectorAll('.chat-markdown-part'));
+		assert.strictEqual(markdownParts.length, 1);
+		assert.strictEqual(markdownParts[0]?.closest('.chat-thinking-box'), null);
+	});
+
+	test('final markdown renders outside thinking with codeblock uri', async () => {
+		await configurationService.setUserConfiguration('chat.agent.thinking.collapsedTools', CollapsedToolsDisplayMode.Always);
+		await configurationService.setUserConfiguration('chat.agent.thinkingStyle', ThinkingDisplayMode.CollapsedPreview);
+
+		const template = renderer.renderTemplate(container);
+		store.add(template.templateDisposables);
+		store.add(toDisposable(() => renderer.disposeTemplate(template)));
+
+		const thinking: IChatThinkingPart = { kind: 'thinking', value: 'Thinking...' };
+		const finalMarkdown: IChatMarkdownContent = {
+			kind: 'markdownContent',
+			content: new MarkdownString('```ts\n<vscode_codeblock_uri>file:///a/b.ts</vscode_codeblock_uri>\n```')
+		};
+		const element = createResponseWithParts([thinking, finalMarkdown]);
+
+		renderer.renderElement({ element } as ITreeNode<ChatTreeItem, FuzzyScore>, 0, template);
+
+		const thinkingBox = template.value.querySelector('.chat-thinking-box');
+		assert.ok(thinkingBox);
+
+		const markdownParts = Array.from(template.value.querySelectorAll('.chat-markdown-part'));
+		assert.strictEqual(markdownParts.length, 1);
+		assert.strictEqual(markdownParts[0]?.closest('.chat-thinking-box'), null);
+	});
+
+	test('pinned markdown stays in thinking while final markdown is outside', async () => {
+		await configurationService.setUserConfiguration('chat.agent.thinking.collapsedTools', CollapsedToolsDisplayMode.Always);
+		await configurationService.setUserConfiguration('chat.agent.thinkingStyle', ThinkingDisplayMode.CollapsedPreview);
+
+		const template = renderer.renderTemplate(container);
+		store.add(template.templateDisposables);
+		store.add(toDisposable(() => renderer.disposeTemplate(template)));
+
+		const thinking: IChatThinkingPart = { kind: 'thinking', value: 'Thinking...' };
+		const pinnedMarkdown: IChatMarkdownContent = {
+			kind: 'markdownContent',
+			content: new MarkdownString('```ts\n<vscode_codeblock_uri>file:///a/edit.ts</vscode_codeblock_uri>\n```')
+		};
+		const finalMarkdown: IChatMarkdownContent = { kind: 'markdownContent', content: new MarkdownString('Final answer.') };
+		const element = createResponseWithParts([thinking, pinnedMarkdown, finalMarkdown]);
+
+		renderer.renderElement({ element } as ITreeNode<ChatTreeItem, FuzzyScore>, 0, template);
+
+		const thinkingBox = template.value.querySelector('.chat-thinking-box');
+		assert.ok(thinkingBox);
+
+		const markdownParts = Array.from(template.value.querySelectorAll('.chat-markdown-part'));
+		const insideThinking = markdownParts.filter(part => part.closest('.chat-thinking-box'));
+		const outsideThinking = markdownParts.filter(part => !part.closest('.chat-thinking-box'));
+		assert.strictEqual(insideThinking.length, 1);
+		assert.strictEqual(outsideThinking.length, 1);
 	});
 });
