@@ -4,11 +4,14 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { mainWindow } from '../../../../../../base/browser/window.js';
+import { ITreeNode } from '../../../../../../base/browser/ui/tree/tree.js';
+import { Event } from '../../../../../../base/common/event.js';
 import { FuzzyScore } from '../../../../../../base/common/filters.js';
 import { URI } from '../../../../../../base/common/uri.js';
-import { ITreeNode } from '../../../../../../base/browser/ui/tree/tree.js';
 import { assertSnapshot } from '../../../../../../base/test/common/snapshot.js';
 import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../../base/test/common/utils.js';
+import { IConfigurationService } from '../../../../../../platform/configuration/common/configuration.js';
+import { TestConfigurationService } from '../../../../../../platform/configuration/test/common/testConfigurationService.js';
 import { IChatTipService } from '../../../browser/chatTipService.js';
 import { ChatEditorOptions } from '../../../browser/widget/chatOptions.js';
 import { ChatListItemRenderer, IChatRendererDelegate } from '../../../browser/widget/chatListRenderer.js';
@@ -18,6 +21,7 @@ import { IChatPendingDividerViewModel } from '../../../common/model/chatViewMode
 import { ChatModeKind } from '../../../common/constants.js';
 import { ChatRequestQueueKind, IChatService } from '../../../common/chatService/chatService.js';
 import { MockChatService } from '../../common/chatService/mockChatService.js';
+import { IViewDescriptorService } from '../../../../../common/views.js';
 import { ITestInstantiationService, workbenchInstantiationService } from '../../../../../test/browser/workbenchTestServices.js';
 
 suite('ChatListItemRenderer', () => {
@@ -26,6 +30,11 @@ suite('ChatListItemRenderer', () => {
 	let instantiationService: ITestInstantiationService;
 	let renderer: ChatListItemRenderer;
 	let container: HTMLElement;
+	let viewDescriptorService: IViewDescriptorService;
+
+	class TestViewDescriptorService implements Partial<IViewDescriptorService> {
+		onDidChangeLocation = Event.None;
+	}
 
 	function createRenderer(options: IChatListItemRendererOptions = {}): ChatListItemRenderer {
 		const editorOptions = store.add(instantiationService.createInstance(
@@ -57,6 +66,34 @@ suite('ChatListItemRenderer', () => {
 
 	setup(() => {
 		instantiationService = store.add(workbenchInstantiationService(undefined, store));
+		instantiationService.stub(IConfigurationService, new TestConfigurationService({
+			editor: {
+				fontFamily: 'monospace',
+				fontWeight: 'normal',
+				wordWrap: 'on',
+				accessibilitySupport: 'auto',
+				fontLigatures: false,
+				bracketPairColorization: {
+					enabled: false,
+					independentColorPoolPerBracketType: false,
+				}
+			},
+			chat: {
+				editor: {
+					fontSize: 14,
+					fontFamily: 'default',
+					fontWeight: 'normal',
+					wordWrap: 'on',
+				}
+			},
+			files: {
+				participants: {
+					timeout: 60000
+				}
+			}
+		}));
+		viewDescriptorService = new TestViewDescriptorService() as IViewDescriptorService;
+		instantiationService.stub(IViewDescriptorService, viewDescriptorService);
 		instantiationService.stub(IChatService, new MockChatService());
 		instantiationService.stub(IChatTipService, { _serviceBrand: undefined, getNextTip: () => undefined });
 		container = mainWindow.document.createElement('div');
