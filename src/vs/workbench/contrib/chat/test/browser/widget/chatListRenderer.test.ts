@@ -7,6 +7,7 @@ import assert from 'assert';
 import { mainWindow } from '../../../../../../base/browser/window.js';
 import { ITreeNode } from '../../../../../../base/browser/ui/tree/tree.js';
 import { Event } from '../../../../../../base/common/event.js';
+import { toDisposable } from '../../../../../../base/common/lifecycle.js';
 import { FuzzyScore } from '../../../../../../base/common/filters.js';
 import { observableValue } from '../../../../../../base/common/observable.js';
 import { URI } from '../../../../../../base/common/uri.js';
@@ -225,6 +226,7 @@ suite('ChatListItemRenderer', () => {
 	test('pending divider queued', async () => {
 		const template = renderer.renderTemplate(container);
 		store.add(template.templateDisposables);
+		store.add(toDisposable(() => renderer.disposeTemplate(template)));
 
 		const element: IChatPendingDividerViewModel = {
 			kind: 'pendingDivider',
@@ -243,6 +245,7 @@ suite('ChatListItemRenderer', () => {
 	test('pending divider hides header elements and toolbars', () => {
 		const template = renderer.renderTemplate(container);
 		store.add(template.templateDisposables);
+		store.add(toDisposable(() => renderer.disposeTemplate(template)));
 
 		const element: IChatPendingDividerViewModel = {
 			kind: 'pendingDivider',
@@ -269,6 +272,7 @@ suite('ChatListItemRenderer', () => {
 	test('pending divider steering', async () => {
 		const template = renderer.renderTemplate(container);
 		store.add(template.templateDisposables);
+		store.add(toDisposable(() => renderer.disposeTemplate(template)));
 
 		const element: IChatPendingDividerViewModel = {
 			kind: 'pendingDivider',
@@ -287,6 +291,7 @@ suite('ChatListItemRenderer', () => {
 	test('confirmation request detail', async () => {
 		const template = renderer.renderTemplate(container);
 		store.add(template.templateDisposables);
+		store.add(toDisposable(() => renderer.disposeTemplate(template)));
 
 		const element = createConfirmationRequest('request-confirmation', 'Keep');
 
@@ -298,6 +303,7 @@ suite('ChatListItemRenderer', () => {
 	test('confirmation request toggles header state', () => {
 		const template = renderer.renderTemplate(container);
 		store.add(template.templateDisposables);
+		store.add(toDisposable(() => renderer.disposeTemplate(template)));
 
 		const element = createConfirmationRequest('request-confirmation-toggle', 'Keep');
 
@@ -312,6 +318,7 @@ suite('ChatListItemRenderer', () => {
 	test('copilot username hides avatar and name', () => {
 		const template = renderer.renderTemplate(container);
 		store.add(template.templateDisposables);
+		store.add(toDisposable(() => renderer.disposeTemplate(template)));
 
 		const element = createRequest({ id: 'request-copilot', username: 'GitHub Copilot' });
 
@@ -325,6 +332,7 @@ suite('ChatListItemRenderer', () => {
 		const minimalRenderer = createRenderer({ renderStyle: 'minimal' });
 		const template = minimalRenderer.renderTemplate(container);
 		store.add(template.templateDisposables);
+		store.add(toDisposable(() => minimalRenderer.disposeTemplate(template)));
 
 		const element = createRequest({ id: 'request-incomplete', isComplete: false });
 
@@ -337,6 +345,7 @@ suite('ChatListItemRenderer', () => {
 		const minimalRenderer = createRenderer({ renderStyle: 'minimal' });
 		const template = minimalRenderer.renderTemplate(container);
 		store.add(template.templateDisposables);
+		store.add(toDisposable(() => minimalRenderer.disposeTemplate(template)));
 
 		const element = createRequest({ id: 'request-complete', isComplete: true });
 
@@ -348,6 +357,7 @@ suite('ChatListItemRenderer', () => {
 	test('request renders attachments when variables exist', () => {
 		const template = renderer.renderTemplate(container);
 		store.add(template.templateDisposables);
+		store.add(toDisposable(() => renderer.disposeTemplate(template)));
 
 		const element = createRequest({
 			id: 'request-attachments',
@@ -364,6 +374,7 @@ suite('ChatListItemRenderer', () => {
 		const editableRenderer = createRenderer({ editable: true });
 		const template = editableRenderer.renderTemplate(container);
 		store.add(template.templateDisposables);
+		store.add(toDisposable(() => editableRenderer.disposeTemplate(template)));
 
 		const element = createRequest({ id: 'request-keydown' });
 		let fired = false;
@@ -384,6 +395,7 @@ suite('ChatListItemRenderer', () => {
 	test('response detail rerun link fires event', () => {
 		const template = renderer.renderTemplate(container);
 		store.add(template.templateDisposables);
+		store.add(toDisposable(() => renderer.disposeTemplate(template)));
 
 		const element = createResponse({
 			id: 'response-rerun',
@@ -408,6 +420,7 @@ suite('ChatListItemRenderer', () => {
 	test('footer details are shown when result details exist', () => {
 		const template = renderer.renderTemplate(container);
 		store.add(template.templateDisposables);
+		store.add(toDisposable(() => renderer.disposeTemplate(template)));
 
 		const element = createResponse({
 			id: 'response-details',
