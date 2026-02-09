@@ -7,6 +7,7 @@ import { mainWindow } from '../../../../../../base/browser/window.js';
 import { ITreeNode } from '../../../../../../base/browser/ui/tree/tree.js';
 import { Event } from '../../../../../../base/common/event.js';
 import { FuzzyScore } from '../../../../../../base/common/filters.js';
+import { observableValue } from '../../../../../../base/common/observable.js';
 import { URI } from '../../../../../../base/common/uri.js';
 import { assertSnapshot } from '../../../../../../base/test/common/snapshot.js';
 import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../../base/test/common/utils.js';
@@ -17,9 +18,10 @@ import { ChatEditorOptions } from '../../../browser/widget/chatOptions.js';
 import { ChatListItemRenderer, IChatRendererDelegate } from '../../../browser/widget/chatListRenderer.js';
 import { CodeBlockModelCollection } from '../../../common/widget/codeBlockModelCollection.js';
 import { ChatTreeItem, IChatListItemRendererOptions } from '../../../browser/chat.js';
-import { IChatPendingDividerViewModel } from '../../../common/model/chatViewModel.js';
+import { IChatPendingDividerViewModel, IChatRequestViewModel } from '../../../common/model/chatViewModel.js';
 import { ChatModeKind } from '../../../common/constants.js';
 import { ChatRequestQueueKind, IChatService } from '../../../common/chatService/chatService.js';
+import { IParsedChatRequest } from '../../../common/requestParser/chatParserTypes.js';
 import { MockChatService } from '../../common/chatService/mockChatService.js';
 import { IViewDescriptorService } from '../../../../../common/views.js';
 import { ITestInstantiationService, workbenchInstantiationService } from '../../../../../test/browser/workbenchTestServices.js';
@@ -62,6 +64,31 @@ suite('ChatListItemRenderer', () => {
 			undefined,
 			undefined
 		));
+	}
+
+	function createConfirmationRequest(id: string, confirmation: string): IChatRequestViewModel {
+		return {
+			id,
+			sessionResource: URI.parse('test://session'),
+			dataId: `${id}-data`,
+			username: 'User',
+			message: {} as IParsedChatRequest,
+			messageText: 'unused',
+			attempt: 0,
+			confirmation,
+			pendingKind: undefined,
+			timestamp: 0,
+			isComplete: true,
+			isCompleteAddedRequest: false,
+			shouldBeBlocked: observableValue('shouldBeBlocked', false),
+			variables: [],
+			contentReferences: [],
+			agentOrSlashCommandDetected: false,
+			slashCommand: undefined,
+			shouldBeRemovedOnSend: undefined,
+			currentRenderedHeight: undefined,
+			modelId: undefined,
+		};
 	}
 
 	setup(() => {
@@ -130,6 +157,17 @@ suite('ChatListItemRenderer', () => {
 			dividerKind: ChatRequestQueueKind.Steering,
 			currentRenderedHeight: undefined,
 		};
+
+		renderer.renderElement({ element } as ITreeNode<ChatTreeItem, FuzzyScore>, 0, template);
+
+		await assertSnapshot(template.rowContainer.outerHTML);
+	});
+
+	test('confirmation request detail', async () => {
+		const template = renderer.renderTemplate(container);
+		store.add(template.templateDisposables);
+
+		const element = createConfirmationRequest('request-confirmation', 'Keep');
 
 		renderer.renderElement({ element } as ITreeNode<ChatTreeItem, FuzzyScore>, 0, template);
 
