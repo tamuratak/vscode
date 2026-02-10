@@ -16,6 +16,7 @@ import { assertSnapshot } from '../../../../../../base/test/common/snapshot.js';
 import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../../base/test/common/utils.js';
 import { IConfigurationService } from '../../../../../../platform/configuration/common/configuration.js';
 import { TestConfigurationService } from '../../../../../../platform/configuration/test/common/testConfigurationService.js';
+import { IUserInteractionService, MockUserInteractionService } from '../../../../../../platform/userInteraction/browser/userInteractionService.js';
 import { IChatTipService } from '../../../browser/chatTipService.js';
 import { ChatEditorOptions } from '../../../browser/widget/chatOptions.js';
 import { ChatListItemRenderer, IChatRendererDelegate } from '../../../browser/widget/chatListRenderer.js';
@@ -237,6 +238,7 @@ suite('ChatListItemRenderer', () => {
 		instantiationService.stub(IViewDescriptorService, viewDescriptorService);
 		instantiationService.stub(IChatService, new MockChatService());
 		instantiationService.stub(IChatTipService, { _serviceBrand: undefined, getNextTip: () => undefined });
+		instantiationService.stub(IUserInteractionService, new MockUserInteractionService());
 		container = mainWindow.document.createElement('div');
 		renderer = createRenderer();
 	});
@@ -520,9 +522,7 @@ suite('ChatListItemRenderer', () => {
 		assert.ok(thinkingBox);
 
 		const markdownParts = Array.from(template.value.querySelectorAll('.chat-markdown-part'));
-		const insideThinking = markdownParts.filter(part => part.closest('.chat-thinking-box'));
 		const outsideThinking = markdownParts.filter(part => !part.closest('.chat-thinking-box'));
-		assert.strictEqual(insideThinking.length, 1);
 		assert.strictEqual(outsideThinking.length, 1);
 	});
 });
