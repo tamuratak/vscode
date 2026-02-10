@@ -312,6 +312,12 @@
 			"problemMatcher": [
 				"$tsc"
 			]
+		},
+		{
+			"label": "chatlisttest",
+			"type": "shell",
+			"command": "./scripts/test.sh -g ChatListItemRenderer",
+			"problemMatcher": []
 		}
 	]
 }
