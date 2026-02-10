@@ -234,6 +234,7 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 	 * by screen readers
 	 */
 	private readonly _announcedToolProgressKeys = new Set<string>();
+	private readonly _pinnedToolInvocations = new Set<string>();
 
 	constructor(
 		editorOptions: ChatEditorOptions,
@@ -1386,8 +1387,15 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 
 	private diff(renderedParts: ReadonlyArray<IChatContentPart>, contentToRender: ReadonlyArray<IChatRendererContent>, element: ChatTreeItem): ReadonlyArray<IChatRendererContent | null> {
 		const diff: (IChatRendererContent | null)[] = [];
+		const responseElement = isResponseVM(element) ? element : undefined;
 		for (let i = 0; i < contentToRender.length; i++) {
 			const content = contentToRender[i];
+			const toolCallId = (content.kind === 'toolInvocation' || content.kind === 'toolInvocationSerialized') ? content.toolCallId : undefined;
+			if (toolCallId && this._pinnedToolInvocations.has(toolCallId) && !this.shouldPinPart(content, responseElement)) {
+				diff.push(content);
+				this._pinnedToolInvocations.delete(toolCallId);
+				continue;
+			}
 			const renderedPart = renderedParts[i];
 
 			if (!renderedPart || !renderedPart.hasSameContent(content, contentToRender.slice(i + 1), element)) {
@@ -1492,6 +1500,22 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 		}
 
 		return false;
+	}
+
+	private trackPinnedToolInvocation(toolInvocation: IChatToolInvocation | IChatToolInvocationSerialized): void {
+		const toolCallId = toolInvocation.toolCallId;
+		if (!toolCallId) {
+			return;
+		}
+		this._pinnedToolInvocations.add(toolCallId);
+	}
+
+	private clearPinnedToolInvocation(toolInvocation: IChatToolInvocation | IChatToolInvocationSerialized): void {
+		const toolCallId = toolInvocation.toolCallId;
+		if (!toolCallId) {
+			return;
+		}
+		this._pinnedToolInvocations.delete(toolCallId);
 	}
 
 	private getLastThinkingPart(renderedParts: ReadonlyArray<IChatContentPart> | undefined): ChatThinkingContentPart | undefined {
@@ -1871,6 +1895,7 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 				if (thinkingPart instanceof ChatThinkingContentPart) {
 					// Append using factory - thinking part decides whether to render lazily
 					thinkingPart.appendItem(createToolPart, toolInvocation.toolId, toolInvocation, templateData.value);
+					this.trackPinnedToolInvocation(toolInvocation);
 					this.setupConfirmationTransitionWatcher(toolInvocation, thinkingPart, () => lazilyCreatedPart, createToolPart, context, templateData);
 				}
 
@@ -1881,12 +1906,14 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 				if (lastThinking && toolInvocation.presentation !== 'hidden') {
 					// Append using factory - thinking part decides whether to render lazily
 					lastThinking.appendItem(createToolPart, toolInvocation.toolId, toolInvocation, templateData.value);
+					this.trackPinnedToolInvocation(toolInvocation);
 					this.setupConfirmationTransitionWatcher(toolInvocation, lastThinking, () => lazilyCreatedPart, createToolPart, context, templateData);
 					return this.renderNoContent((other, followingContent, element) => lazilyCreatedPart ?
 						lazilyCreatedPart.hasSameContent(other, followingContent, element) :
 						toolInvocation.kind === other.kind);
 				}
 			} else {
+				this.clearPinnedToolInvocation(toolInvocation);
 				this.finalizeCurrentThinkingPart(context, templateData);
 			}
 		}
@@ -1917,6 +1944,7 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 		}
 
 		const removeConfirmationWidget = () => {
+			this.clearPinnedToolInvocation(toolInvocation);
 			const createdPart = getCreatedPart();
 			// move the created part out of thinking and into the main template
 			if (createdPart?.domNode) {
