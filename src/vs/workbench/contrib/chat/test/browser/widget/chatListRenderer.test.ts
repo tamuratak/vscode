@@ -525,4 +525,49 @@ suite('ChatListItemRenderer', () => {
 		const outsideThinking = markdownParts.filter(part => !part.closest('.chat-thinking-box'));
 		assert.strictEqual(outsideThinking.length, 1);
 	});
+
+	test('final markdown renders outside thinking in collapsed mode', async () => {
+		await configurationService.setUserConfiguration('chat.agent.thinking.collapsedTools', CollapsedToolsDisplayMode.Always);
+		await configurationService.setUserConfiguration('chat.agent.thinkingStyle', ThinkingDisplayMode.Collapsed);
+
+		const template = renderer.renderTemplate(container);
+		store.add(template.templateDisposables);
+		store.add(toDisposable(() => renderer.disposeTemplate(template)));
+
+		const thinking: IChatThinkingPart = { kind: 'thinking', value: 'Thinking...' };
+		const finalMarkdown: IChatMarkdownContent = { kind: 'markdownContent', content: new MarkdownString('Final answer.') };
+		const element = createResponseWithParts([thinking, finalMarkdown]);
+
+		renderer.renderElement({ element } as ITreeNode<ChatTreeItem, FuzzyScore>, 0, template);
+
+		const thinkingBox = template.value.querySelector('.chat-thinking-box');
+		assert.ok(thinkingBox);
+
+		const markdownParts = Array.from(template.value.querySelectorAll('.chat-markdown-part'));
+		assert.strictEqual(markdownParts.length, 1);
+		assert.strictEqual(markdownParts[0]?.closest('.chat-thinking-box'), null);
+	});
+
+	test('final markdown renders outside thinking with multiple thinking parts', async () => {
+		await configurationService.setUserConfiguration('chat.agent.thinking.collapsedTools', CollapsedToolsDisplayMode.Always);
+		await configurationService.setUserConfiguration('chat.agent.thinkingStyle', ThinkingDisplayMode.FixedScrolling);
+
+		const template = renderer.renderTemplate(container);
+		store.add(template.templateDisposables);
+		store.add(toDisposable(() => renderer.disposeTemplate(template)));
+
+		const thinkingOne: IChatThinkingPart = { kind: 'thinking', value: 'Thinking 1...' };
+		const thinkingTwo: IChatThinkingPart = { kind: 'thinking', value: 'Thinking 2...' };
+		const finalMarkdown: IChatMarkdownContent = { kind: 'markdownContent', content: new MarkdownString('Final answer.') };
+		const element = createResponseWithParts([thinkingOne, thinkingTwo, finalMarkdown]);
+
+		renderer.renderElement({ element } as ITreeNode<ChatTreeItem, FuzzyScore>, 0, template);
+
+		const thinkingBox = template.value.querySelector('.chat-thinking-box');
+		assert.ok(thinkingBox);
+
+		const markdownParts = Array.from(template.value.querySelectorAll('.chat-markdown-part'));
+		assert.strictEqual(markdownParts.length, 1);
+		assert.strictEqual(markdownParts[0]?.closest('.chat-thinking-box'), null);
+	});
 });
