@@ -51,7 +51,7 @@ import { ChatContextKeys } from '../../common/actions/chatContextKeys.js';
 import { ModifiedFileEntryState } from '../../common/editing/chatEditingService.js';
 import { IChatModel, IChatResponseModel } from '../../common/model/chatModel.js';
 import { ChatMode, IChatMode, IChatModeService } from '../../common/chatModes.js';
-import { ElicitationState, IChatService, IChatToolInvocation } from '../../common/chatService/chatService.js';
+import { ElicitationState, IChatContentInlineReference, IChatService, IChatToolInvocation } from '../../common/chatService/chatService.js';
 import { ISCMHistoryItemChangeRangeVariableEntry, ISCMHistoryItemChangeVariableEntry } from '../../common/attachments/chatVariableEntries.js';
 import { IChatRequestViewModel, IChatResponseViewModel, isRequestVM } from '../../common/model/chatViewModel.js';
 import { IChatWidgetHistoryService } from '../../common/widget/chatWidgetHistoryService.js';
@@ -68,6 +68,8 @@ import { getChatSessionType, LocalChatSessionUri } from '../../common/model/chat
 import { localChatSessionType } from '../../common/chatSessionsService.js';
 import { generateUuid } from '../../../../../base/common/uuid.js';
 import { ChatViewPane } from '../widgetHosts/viewPane/chatViewPane.js';
+import { contentRefUrl } from '../../common/widget/annotations.js';
+import { hasKey } from '../../../../../base/common/types.js';
 
 export const CHAT_CATEGORY = localize2('chat.category', 'Chat');
 
@@ -1365,8 +1367,92 @@ export function stringifyItem(item: IChatRequestViewModel | IChatResponseViewMod
 	if (isRequestVM(item)) {
 		return (includeName ? `${item.username}: ` : '') + item.messageText;
 	} else {
-		return (includeName ? `${item.username}: ` : '') + item.response.toString();
+		const responseText = stringifyResponseForCopy(item.response) || item.response.toString();
+		return (includeName ? `${item.username}: ` : '') + responseText;
 	}
+}
+
+function stringifyResponseForCopy(response: IChatResponseViewModel['response']): string {
+	const segments: string[] = [];
+
+	for (const part of response.value) {
+		switch (part.kind) {
+			case 'markdownContent':
+				segments.push(resolveInlineReferencePlaceholderLinks(part.content.value, part.inlineReferences));
+				break;
+			case 'inlineReference':
+				segments.push(inlineReferenceToMarkdown(part));
+				break;
+		}
+	}
+
+	return segments.join('');
+}
+
+function resolveInlineReferencePlaceholderLinks(value: string, inlineReferences: Record<string, IChatContentInlineReference> | undefined): string {
+	if (!inlineReferences) {
+		return value;
+	}
+
+	const escapedPrefix = contentRefUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	const placeholderPattern = new RegExp(`\\]\\((${escapedPrefix}\\/(\\d+))\\)`, 'g');
+
+	return value.replace(placeholderPattern, (match, _placeholder, refId: string) => {
+		const inlineReference = inlineReferences[refId];
+		const uri = inlineReference ? getInlineReferenceUri(inlineReference.inlineReference) : undefined;
+		if (!uri) {
+			return match;
+		}
+
+		return `](${escapeMarkdownLinkTarget(uri.toString(false))})`;
+	});
+}
+
+function inlineReferenceToMarkdown(part: IChatContentInlineReference): string {
+	const uri = getInlineReferenceUri(part.inlineReference);
+	if (!uri) {
+		return part.name ? '`' + part.name + '`' : '';
+	}
+
+	const label = getInlineReferenceLabel(part);
+	return `[${escapeMarkdownLinkLabel(label)}](${escapeMarkdownLinkTarget(uri.toString(false))})`;
+}
+
+function getInlineReferenceLabel(part: IChatContentInlineReference): string {
+	if (part.name) {
+		return part.name;
+	}
+
+	const inlineReference = part.inlineReference;
+	if (URI.isUri(inlineReference)) {
+		return basename(inlineReference);
+	}
+
+	if (hasKey(inlineReference, { uri: true })) {
+		return basename(inlineReference.uri);
+	}
+
+	return inlineReference.name;
+}
+
+function getInlineReferenceUri(inlineReference: IChatContentInlineReference['inlineReference']): URI | undefined {
+	if (URI.isUri(inlineReference)) {
+		return inlineReference;
+	}
+
+	if (hasKey(inlineReference, { uri: true })) {
+		return inlineReference.uri;
+	}
+
+	return inlineReference.location.uri;
+}
+
+function escapeMarkdownLinkLabel(label: string): string {
+	return label.replace(/[\\\]]/g, '\\$&');
+}
+
+function escapeMarkdownLinkTarget(target: string): string {
+	return target.replace(/[\\)]/g, '\\$&');
 }
 
 export interface IToolFilteringOptions {
