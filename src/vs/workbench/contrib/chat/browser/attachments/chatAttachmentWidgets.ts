@@ -51,7 +51,7 @@ import { IOpenerService, OpenInternalOptions } from '../../../../../platform/ope
 import { FolderThemeIcon, IThemeService } from '../../../../../platform/theme/common/themeService.js';
 import { fillEditorsDragData } from '../../../../browser/dnd.js';
 import { IFileLabelOptions, IResourceLabel, ResourceLabels } from '../../../../browser/labels.js';
-import { ResourceContextKey } from '../../../../common/contextkeys.js';
+import { ResourceContextKey, StaticResourceContextKey } from '../../../../common/contextkeys.js';
 import { IEditorService, SIDE_GROUP } from '../../../../services/editor/common/editorService.js';
 import { IPreferencesService } from '../../../../services/preferences/common/preferences.js';
 import { revealInSideBarCommand } from '../../../files/browser/fileActions.contribution.js';
@@ -1394,7 +1394,7 @@ export function hookUpResourceAttachmentDragAndContextMenu(accessor: ServicesAcc
 	return store;
 }
 
-export function hookUpSymbolAttachmentDragAndContextMenu(accessor: ServicesAccessor, widget: HTMLElement, parentContextKeyService: IContextKeyService, attachment: { name: string; value: Location; kind: SymbolKind }, contextMenuId: MenuId): IDisposable {
+export function hookUpSymbolAttachmentDragAndContextMenu(accessor: ServicesAccessor, widget: HTMLElement, parentContextKeyService: IContextKeyService, attachment: { name: string; value: Location; kind: SymbolKind }, contextMenuId: MenuId, options?: { useStaticResourceContext?: boolean }): IDisposable {
 	const instantiationService = accessor.get(IInstantiationService);
 	const languageFeaturesService = accessor.get(ILanguageFeaturesService);
 	const textModelService = accessor.get(ITextModelService);
@@ -1422,7 +1422,7 @@ export function hookUpSymbolAttachmentDragAndContextMenu(accessor: ServicesAcces
 	// but resource context and provider contexts are initialized lazily on first use)
 	const scopedContextKeyService = store.add(parentContextKeyService.createScoped(widget));
 	chatAttachmentResourceContextKey.bindTo(scopedContextKeyService).set(attachment.value.uri.toString());
-	store.add(setResourceContext(accessor, scopedContextKeyService, attachment.value.uri));
+	store.add(setResourceContext(accessor, scopedContextKeyService, attachment.value.uri, options?.useStaticResourceContext === true));
 
 	let providerContexts: ReadonlyArray<[IContextKey<boolean>, LanguageFeatureRegistry<unknown>]> | undefined;
 
@@ -1473,10 +1473,16 @@ export function hookUpSymbolAttachmentDragAndContextMenu(accessor: ServicesAcces
 	return store;
 }
 
-function setResourceContext(accessor: ServicesAccessor, scopedContextKeyService: IScopedContextKeyService, resource: URI) {
+function setResourceContext(accessor: ServicesAccessor, scopedContextKeyService: IScopedContextKeyService, resource: URI, useStaticResourceContext = false): IDisposable {
 	const fileService = accessor.get(IFileService);
 	const languageService = accessor.get(ILanguageService);
 	const modelService = accessor.get(IModelService);
+
+	if (useStaticResourceContext) {
+		const resourceContextKey = new StaticResourceContextKey(scopedContextKeyService, fileService, languageService, modelService);
+		resourceContextKey.set(resource);
+		return toDisposable(() => resourceContextKey.reset());
+	}
 
 	const resourceContextKey = new ResourceContextKey(scopedContextKeyService, fileService, languageService, modelService);
 	resourceContextKey.set(resource);

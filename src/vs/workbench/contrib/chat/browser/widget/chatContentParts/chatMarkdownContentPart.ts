@@ -235,6 +235,8 @@ export class ChatMarkdownContentPart extends Disposable implements IChatContentP
 							textModel = modelRefPromise.then(ref => {
 								if (!store.isDisposed) {
 									store.add(ref);
+								} else {
+									ref.dispose();
 								}
 								return ref.object.textEditorModel;
 							});
