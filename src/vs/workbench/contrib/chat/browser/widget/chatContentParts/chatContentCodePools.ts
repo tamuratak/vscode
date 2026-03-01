@@ -12,6 +12,7 @@ import { CodeBlockPart, CodeCompareBlockPart } from './codeBlockPart.js';
 import { ResourcePool, IDisposableReference } from './chatCollections.js';
 
 export class EditorPool extends Disposable {
+	private static readonly MAX_UNUSED_EDITORS = 100;
 
 	private readonly _pool: ResourcePool<CodeBlockPart>;
 
@@ -29,7 +30,7 @@ export class EditorPool extends Disposable {
 		super();
 		this._pool = this._register(new ResourcePool(() => {
 			return instantiationService.createInstance(CodeBlockPart, options, MenuId.ChatCodeBlock, delegate, overflowWidgetsDomNode, this.isSimpleWidget);
-		}));
+		}, EditorPool.MAX_UNUSED_EDITORS));
 	}
 
 	get(): IDisposableReference<CodeBlockPart> {
@@ -52,6 +53,7 @@ export class EditorPool extends Disposable {
 }
 
 export class DiffEditorPool extends Disposable {
+	private static readonly MAX_UNUSED_EDITORS = 40;
 
 	private readonly _pool: ResourcePool<CodeCompareBlockPart>;
 
@@ -69,7 +71,7 @@ export class DiffEditorPool extends Disposable {
 		super();
 		this._pool = this._register(new ResourcePool(() => {
 			return instantiationService.createInstance(CodeCompareBlockPart, options, MenuId.ChatCompareBlock, delegate, overflowWidgetsDomNode, this.isSimpleWidget);
-		}));
+		}, DiffEditorPool.MAX_UNUSED_EDITORS));
 	}
 
 	get(): IDisposableReference<CodeCompareBlockPart> {
