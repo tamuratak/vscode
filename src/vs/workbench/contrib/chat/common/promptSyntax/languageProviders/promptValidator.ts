@@ -1297,11 +1297,17 @@ class ModelTracker extends Disposable {
 		super();
 		this.delayer = this._register(new Delayer<void>(200));
 		this._register(textModel.onDidChangeContent(() => this.validate()));
+		this._register(textModel.onDidChangeAttached(() => this.validate()));
 		this.validate();
 	}
 
 	public validate(): void {
 		this.delayer.trigger(async () => {
+			if (!this.textModel.isAttachedToEditor()) {
+				this.markerService.remove(MARKERS_OWNER_ID, [this.textModel.uri]);
+				return;
+			}
+
 			const markers: IMarkerData[] = [];
 			const ast = this.promptsService.getParsedPromptFile(this.textModel);
 			await this.validator.validate(ast, this.promptType, m => markers.push(m));
