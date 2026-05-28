@@ -113,6 +113,9 @@ class MockLanguageModelsService implements ILanguageModelsService {
 		throw new Error('Method not implemented.');
 	}
 
+	cancelChatRequest(_requestId: number): void {
+	}
+
 	computeTokenLength(): Promise<number> {
 		throw new Error('Method not implemented.');
 	}

@@ -73,6 +73,9 @@ export class NullLanguageModelsService implements ILanguageModelsService {
 		throw new Error('Method not implemented.');
 	}
 
+	cancelChatRequest(_requestId: number): void {
+	}
+
 	computeTokenLength(identifier: string, message: string | IChatMessage, token: CancellationToken): Promise<number> {
 		throw new Error('Method not implemented.');
 	}

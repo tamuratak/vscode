@@ -32,7 +32,7 @@ export class MainThreadLanguageModels implements MainThreadLanguageModelsShape {
 	private readonly _store = new DisposableStore();
 	private readonly _providerRegistrations = new DisposableMap<string>();
 	private readonly _lmProviderChange = new Emitter<{ vendor: string }>();
-	private readonly _pendingProgress = new Map<number, { defer: DeferredPromise<unknown>; stream: AsyncIterableSource<IChatResponsePart | IChatResponsePart[]> }>();
+	private readonly _pendingProgress = new Map<number, { defer: DeferredPromise<unknown>; stream: AsyncIterableSource<IChatResponsePart | IChatResponsePart[]>; cancelListener: IDisposable }>();
 	private readonly _ignoredFileProviderRegistrations = new DisposableMap<number>();
 
 	constructor(
@@ -78,8 +78,12 @@ export class MainThreadLanguageModels implements MainThreadLanguageModelsShape {
 					const defer = new DeferredPromise<unknown>();
 					const stream = new AsyncIterableSource<IChatResponsePart | IChatResponsePart[]>();
 
+					const cancelListener = token.onCancellationRequested(() => {
+						this._proxy.$cancelLanguageModelChatRequest(requestId);
+					});
+
 					try {
-						this._pendingProgress.set(requestId, { defer, stream });
+						this._pendingProgress.set(requestId, { defer, stream, cancelListener });
 						await Promise.all(
 							messages.flatMap(msg => msg.content)
 								.filter(part => part.type === 'image_url')
@@ -89,6 +93,7 @@ export class MainThreadLanguageModels implements MainThreadLanguageModelsShape {
 						);
 						await this._proxy.$startChatRequest(modelId, requestId, from, new SerializableObjectWithBuffers(messages), options, token);
 					} catch (err) {
+						cancelListener.dispose();
 						this._pendingProgress.delete(requestId);
 						throw err;
 					}
@@ -100,6 +105,9 @@ export class MainThreadLanguageModels implements MainThreadLanguageModelsShape {
 				},
 				provideTokenCount: (modelId, str, token) => {
 					return this._proxy.$provideTokenLength(modelId, str, token);
+				},
+				cancelChatRequest: (requestId: number) => {
+					this._proxy.$cancelLanguageModelChatRequest(requestId);
 				},
 			}));
 			this._providerRegistrations.set(vendor, disposables);
@@ -125,6 +133,7 @@ export class MainThreadLanguageModels implements MainThreadLanguageModelsShape {
 		const data = this._pendingProgress.get(requestId);
 		this._logService.trace('[LM] report response DONE', Boolean(data), requestId, err);
 		if (data) {
+			data.cancelListener.dispose();
 			this._pendingProgress.delete(requestId);
 			if (err) {
 				const error = LanguageModelError.tryDeserialize(err) ?? transformErrorFromSerialization(err);
@@ -139,6 +148,10 @@ export class MainThreadLanguageModels implements MainThreadLanguageModelsShape {
 
 	$unregisterProvider(vendor: string): void {
 		this._providerRegistrations.deleteAndDispose(vendor);
+	}
+
+	$cancelLanguageModelChatRequest(requestId: number): void {
+		this._chatProviderService.cancelChatRequest(requestId);
 	}
 
 	$selectChatModels(selector: ILanguageModelChatSelector): Promise<string[]> {
