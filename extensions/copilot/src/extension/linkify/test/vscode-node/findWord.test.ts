@@ -187,4 +187,41 @@ suite('ReferencesSymbolResolver', () => {
 
 		assert.strictEqual(result, undefined);
 	});
+
+	test('Should still attempt symbol resolution for identifier-like code with whitespace', async () => {
+		// Code like `type func_name()` contains whitespace but is composed of valid identifiers,
+		// so it should NOT be blocked by the non-identifier guard.
+		const contents = [
+			'export function func_name(): void {}',
+		].join('\n');
+		const { uri } = await createTestFile('src/file.ts', contents);
+
+		const parserService = new TestParserService([symbol(contents, 'func_name')]);
+		const resolver = new ReferencesSymbolResolver(
+			{ symbolMatchesOnly: true, maxResultCount: 8 },
+			{
+				_serviceBrand: undefined,
+				invokeFunction: (fn: Function, ...args: unknown[]) => {
+					return fn({
+						get: (id: unknown) => {
+							if (id === IParserService) {
+								return asParserService(parserService);
+							}
+							return undefined;
+						}
+					}, ...args);
+				},
+				createInstance: () => { throw new Error('Not implemented'); },
+				createChild: () => { throw new Error('Not implemented'); },
+				dispose: () => { },
+			} as any,
+		);
+
+		const references = [{ anchor: uri }];
+		// `type func_name()` should pass the guard and `func_name` should be found
+		const result = await resolver.resolve('type func_name()', references as any, CancellationToken.None);
+
+		assert.ok(result, 'Expected symbol resolution to succeed for identifier-like code with whitespace');
+		assert.strictEqual(result.length, 1);
+	});
 });

@@ -389,10 +389,10 @@ export class ReferencesSymbolResolver {
 
 		// But then try breaking up inline code into symbol parts
 		if (!wordMatches.length) {
-			// If the inline code contains whitespace, it is likely a command-line flag or a
-			// multi-word code snippet (e.g. `-D ALLOW_RW_ROOT_0=/path`) rather than a qualified
-			// symbol name. Splitting it into parts would produce spurious matches, so skip.
-			if (/\s/.test(codeText)) {
+			// If the inline code contains non-identifier characters (after stripping whitespace),
+			// it is likely a command-line flag (e.g. `-D ALLOW_RW_ROOT_0=/path`) rather than a
+			// qualified symbol name. Splitting it into parts would produce spurious matches, so skip.
+			if (!isLikelySymbolReference(codeText)) {
 				return;
 			}
 
@@ -437,4 +437,21 @@ export class ReferencesSymbolResolver {
 
 		return wordMatches.slice(0, this.findWordOptions.maxResultCount);
 	}
+}
+
+/**
+ * Check if a code text is likely a symbol reference (e.g. `TextModel.undo()`, `type func_name()`).
+ * Returns false if the text contains non-identifier characters after stripping whitespace,
+ * which indicates it is a command-line flag or other non-symbol code (e.g. `-D ALLOW_RW_ROOT_0=/path`).
+ * Processes each line independently so multi-line code is handled correctly.
+ */
+function isLikelySymbolReference(codeText: string): boolean {
+	const validPattern = /^[a-zA-Z0-9_$.()]+$/;
+	for (const line of codeText.split('\n')) {
+		const stripped = line.replace(/\s/g, '');
+		if (stripped && !validPattern.test(stripped)) {
+			return false;
+		}
+	}
+	return true;
 }
