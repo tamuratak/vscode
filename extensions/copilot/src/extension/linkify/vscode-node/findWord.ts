@@ -389,6 +389,13 @@ export class ReferencesSymbolResolver {
 
 		// But then try breaking up inline code into symbol parts
 		if (!wordMatches.length) {
+			// If the inline code contains whitespace, it is likely a command-line flag or a
+			// multi-word code snippet (e.g. `-D ALLOW_RW_ROOT_0=/path`) rather than a qualified
+			// symbol name. Splitting it into parts would produce spurious matches, so skip.
+			if (/\s/.test(codeText)) {
+				return;
+			}
+
 			// Extract all symbol parts from the code text
 			// For example: `TextModel.undo()` -> ['TextModel', 'undo']
 			const symbolParts = extractSymbolNamesInCode(codeText);

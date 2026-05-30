@@ -4,9 +4,10 @@
  *--------------------------------------------------------------------------------------------*/
 
 import assert from 'assert';
+import { IParserService } from '../../../../platform/parser/node/parserService';
 import { CancellationToken } from '../../../../util/vs/base/common/cancellation';
 import { URI } from '../../../../util/vs/base/common/uri';
-import { findSymbolLocationInFile, SymbolFileCache } from '../../vscode-node/findWord';
+import { findSymbolLocationInFile, ReferencesSymbolResolver, SymbolFileCache } from '../../vscode-node/findWord';
 import { asParserService, createTestFile, declaration, symbol, TestParserService } from './util';
 
 suite('Find symbol location in file', () => {
@@ -147,5 +148,43 @@ suite('Find symbol location in file', () => {
 		assert.strictEqual(parserService.parseCount, 1);
 		assert.strictEqual(parserService.genericSymbolQueryCount, 1);
 		assert.deepStrictEqual(parserService.genericSymbolRanges, [{ startIndex: 0, endIndex: contents.length }]);
+	});
+});
+
+suite('ReferencesSymbolResolver', () => {
+
+	test('Should not attempt symbol resolution for inline code containing whitespace', async () => {
+		// Command-line flags such as `-D ALLOW_RW_ROOT_0=/path` should not be split
+		// into symbol parts and matched against references.
+		const contents = [
+			'export function path(): void {}',
+		].join('\n');
+		const { uri } = await createTestFile('src/file.ts', contents);
+
+		const parserService = new TestParserService([symbol(contents, 'path')]);
+		const resolver = new ReferencesSymbolResolver(
+			{ symbolMatchesOnly: true, maxResultCount: 8 },
+			{
+				_serviceBrand: undefined,
+				invokeFunction: (fn: Function, ...args: unknown[]) => {
+					return fn({
+						get: (id: unknown) => {
+							if (id === IParserService) {
+								return asParserService(parserService);
+							}
+							return undefined;
+						}
+					}, ...args);
+				},
+				createInstance: () => { throw new Error('Not implemented'); },
+				createChild: () => { throw new Error('Not implemented'); },
+				dispose: () => { },
+			} as any,
+		);
+
+		const references = [{ anchor: uri }];
+		const result = await resolver.resolve('-D ALLOW_RW_ROOT_0=/path', references as any, CancellationToken.None);
+
+		assert.strictEqual(result, undefined);
 	});
 });
