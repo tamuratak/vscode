@@ -182,7 +182,7 @@ suite('ReferencesSymbolResolver', () => {
 		const resolver = createResolver(parserService);
 
 		const references = [{ anchor: uri }];
-		const result = await resolver.resolve('-D ALLOW_RW_ROOT_0=/path', references, CancellationToken.None);
+		const result = await resolver.resolve('-D ALLOW_RW_ROOT_0=/path', references as any, CancellationToken.None);
 
 		assert.strictEqual(result, undefined);
 	});
