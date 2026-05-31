@@ -439,6 +439,8 @@ export class ReferencesSymbolResolver {
 	}
 }
 
+const nonSymbolCharPattern = /[-=\/]/;
+
 /**
  * Check if a code text is likely a symbol reference (e.g. `TextModel.undo()`, `Array<string>`,
  * `type func_name()`). Returns false if the text contains characters that strongly indicate
@@ -448,7 +450,6 @@ export class ReferencesSymbolResolver {
 function isLikelySymbolReference(codeText: string): boolean {
 	for (const line of codeText.split('\n')) {
 		const stripped = line.replace(/\s/g, '');
-		const nonSymbolCharPattern = /[-=\/]/;
 		if (stripped && nonSymbolCharPattern.test(stripped)) {
 			return false;
 		}
