@@ -153,16 +153,8 @@ suite('Find symbol location in file', () => {
 
 suite('ReferencesSymbolResolver', () => {
 
-	test('Should not attempt symbol resolution for inline code containing whitespace', async () => {
-		// Command-line flags such as `-D ALLOW_RW_ROOT_0=/path` should not be split
-		// into symbol parts and matched against references.
-		const contents = [
-			'export function path(): void {}',
-		].join('\n');
-		const { uri } = await createTestFile('src/file.ts', contents);
-
-		const parserService = new TestParserService([symbol(contents, 'path')]);
-		const resolver = new ReferencesSymbolResolver(
+	function createResolver(parserService: TestParserService): ReferencesSymbolResolver {
+		return new ReferencesSymbolResolver(
 			{ symbolMatchesOnly: true, maxResultCount: 8 },
 			{
 				_serviceBrand: undefined,
@@ -181,6 +173,13 @@ suite('ReferencesSymbolResolver', () => {
 				dispose: () => { },
 			} as any,
 		);
+	}
+
+	test('Should not attempt symbol resolution for command-line flags', async () => {
+		const contents = 'export function path(): void {}';
+		const { uri } = await createTestFile('src/file.ts', contents);
+		const parserService = new TestParserService([symbol(contents, 'path')]);
+		const resolver = createResolver(parserService);
 
 		const references = [{ anchor: uri }];
 		const result = await resolver.resolve('-D ALLOW_RW_ROOT_0=/path', references as any, CancellationToken.None);
@@ -188,40 +187,79 @@ suite('ReferencesSymbolResolver', () => {
 		assert.strictEqual(result, undefined);
 	});
 
-	test('Should still attempt symbol resolution for identifier-like code with whitespace', async () => {
-		// Code like `type func_name()` contains whitespace but is composed of valid identifiers,
-		// so it should NOT be blocked by the non-identifier guard.
-		const contents = [
-			'export function func_name(): void {}',
-		].join('\n');
+	test('Should not attempt symbol resolution for long flags', async () => {
+		const contents = 'export function verbose(): void {}';
 		const { uri } = await createTestFile('src/file.ts', contents);
-
-		const parserService = new TestParserService([symbol(contents, 'func_name')]);
-		const resolver = new ReferencesSymbolResolver(
-			{ symbolMatchesOnly: true, maxResultCount: 8 },
-			{
-				_serviceBrand: undefined,
-				invokeFunction: (fn: Function, ...args: unknown[]) => {
-					return fn({
-						get: (id: unknown) => {
-							if (id === IParserService) {
-								return asParserService(parserService);
-							}
-							return undefined;
-						}
-					}, ...args);
-				},
-				createInstance: () => { throw new Error('Not implemented'); },
-				createChild: () => { throw new Error('Not implemented'); },
-				dispose: () => { },
-			} as any,
-		);
+		const parserService = new TestParserService([symbol(contents, 'verbose')]);
+		const resolver = createResolver(parserService);
 
 		const references = [{ anchor: uri }];
-		// `type func_name()` should pass the guard and `func_name` should be found
+		const result = await resolver.resolve('--verbose', references as any, CancellationToken.None);
+
+		assert.strictEqual(result, undefined);
+	});
+
+	test('Should not attempt symbol resolution for paths', async () => {
+		const contents = 'export function path(): void {}';
+		const { uri } = await createTestFile('src/file.ts', contents);
+		const parserService = new TestParserService([symbol(contents, 'path')]);
+		const resolver = createResolver(parserService);
+
+		const references = [{ anchor: uri }];
+		const result = await resolver.resolve('/usr/local/bin', references as any, CancellationToken.None);
+
+		assert.strictEqual(result, undefined);
+	});
+
+	test('Should attempt symbol resolution for identifier-like code with whitespace', async () => {
+		const contents = 'export function func_name(): void {}';
+		const { uri } = await createTestFile('src/file.ts', contents);
+		const parserService = new TestParserService([symbol(contents, 'func_name')]);
+		const resolver = createResolver(parserService);
+
+		const references = [{ anchor: uri }];
 		const result = await resolver.resolve('type func_name()', references as any, CancellationToken.None);
 
 		assert.ok(result, 'Expected symbol resolution to succeed for identifier-like code with whitespace');
 		assert.strictEqual(result.length, 1);
+	});
+
+	test('Should attempt symbol resolution for generic types', async () => {
+		const contents = 'export class Array<T> {}';
+		const { uri } = await createTestFile('src/file.ts', contents);
+		const parserService = new TestParserService([symbol(contents, 'Array')]);
+		const resolver = createResolver(parserService);
+
+		const references = [{ anchor: uri }];
+		// `Array<string>` should pass the guard — `<`, `>`, and `,` are not blocked
+		const result = await resolver.resolve('Array<string>', references as any, CancellationToken.None);
+
+		assert.ok(result, 'Expected symbol resolution to succeed for generic types');
+	});
+
+	test('Should attempt symbol resolution for array types', async () => {
+		const contents = 'export type string = any;';
+		const { uri } = await createTestFile('src/file.ts', contents);
+		const parserService = new TestParserService([symbol(contents, 'string')]);
+		const resolver = createResolver(parserService);
+
+		const references = [{ anchor: uri }];
+		// `string[]` should pass the guard — `[` and `]` are not blocked
+		const result = await resolver.resolve('string[]', references as any, CancellationToken.None);
+
+		assert.ok(result, 'Expected symbol resolution to succeed for array types');
+	});
+
+	test('Should attempt symbol resolution for private fields', async () => {
+		const contents = 'export class Foo { #bar = 1; }';
+		const { uri } = await createTestFile('src/file.ts', contents);
+		const parserService = new TestParserService([symbol(contents, '#bar')]);
+		const resolver = createResolver(parserService);
+
+		const references = [{ anchor: uri }];
+		// `#bar` should pass the guard — `#` is not blocked
+		const result = await resolver.resolve('#bar', references as any, CancellationToken.None);
+
+		assert.ok(result, 'Expected symbol resolution to succeed for private fields');
 	});
 });

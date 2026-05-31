@@ -440,16 +440,16 @@ export class ReferencesSymbolResolver {
 }
 
 /**
- * Check if a code text is likely a symbol reference (e.g. `TextModel.undo()`, `type func_name()`).
- * Returns false if the text contains non-identifier characters after stripping whitespace,
- * which indicates it is a command-line flag or other non-symbol code (e.g. `-D ALLOW_RW_ROOT_0=/path`).
+ * Check if a code text is likely a symbol reference (e.g. `TextModel.undo()`, `Array<string>`,
+ * `type func_name()`). Returns false if the text contains characters that strongly indicate
+ * command-line flags or paths (such as `-`, `=`, `/`), which are not part of symbol references.
  * Processes each line independently so multi-line code is handled correctly.
  */
 function isLikelySymbolReference(codeText: string): boolean {
-	const validPattern = /^[a-zA-Z0-9_$.()]+$/;
 	for (const line of codeText.split('\n')) {
 		const stripped = line.replace(/\s/g, '');
-		if (stripped && !validPattern.test(stripped)) {
+		const nonSymbolCharPattern = /[-=\/]/;
+		if (stripped && nonSymbolCharPattern.test(stripped)) {
 			return false;
 		}
 	}
