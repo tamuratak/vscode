@@ -1790,6 +1790,15 @@ export class ChatWidget extends Disposable implements IChatWidget {
 		if (!isInput) {
 			this.inputPart.setChatMode(this.input.currentModeObs.get().id);
 			this.inputPart.setPermissionLevel(this.input.currentModeInfo.permissionLevel ?? ChatPermissionLevel.Default);
+			// Sync the model selection from the inline input back to the main input
+			// so that the user's chosen model is used when the request is sent.
+			const inlineModel = this.inlineInputPartDisposable.value;
+			if (inlineModel) {
+				const currentModel = inlineModel.selectedLanguageModel.get();
+				if (currentModel) {
+					this.inputPart.setCurrentLanguageModel(currentModel);
+				}
+			}
 
 			this.inputPart?.toggleChatInputOverlay(false);
 			try {
