@@ -7,7 +7,7 @@ import { IWorkspaceService } from '../../../platform/workspace/common/workspaceS
 import { FinalizableChatResponseStream } from '../../../util/common/chatResponseStreamImpl';
 import { CancellationToken } from '../../../util/vs/base/common/cancellation';
 import { ChatHookType, ChatResponseAnchorPart, ChatResponseCommandButtonPart, ChatResponseConfirmationPart, ChatResponseFileTreePart, ChatResponseMarkdownPart, ChatResponseThinkingProgressPart, ChatToolInvocationPart, MarkdownString } from '../../../vscodeTypes';
-import { LinkifiedText, LinkifySymbolAnchor } from './linkifiedText';
+import { LinkifiedPart, LinkifiedText, LinkifyLocationAnchor, LinkifySymbolAnchor } from './linkifiedText';
 import { IContributedLinkifierFactory, ILinkifier, ILinkifyService, LinkifierContext } from './linkifyService';
 
 /**
@@ -246,7 +246,10 @@ export class ResponseStreamWithLinkification implements FinalizableChatResponseS
 	}
 
 	private outputMarkdown(textToApply: LinkifiedText) {
-		for (const part of textToApply.parts) {
+		const workspaceFolders = this.workspaceService.getWorkspaceFolders();
+
+		for (let i = 0; i < textToApply.parts.length; i++) {
+			const part = textToApply.parts[i];
 			if (typeof part === 'string') {
 				if (!part.length) {
 					continue;
@@ -254,7 +257,7 @@ export class ResponseStreamWithLinkification implements FinalizableChatResponseS
 
 				const content = new MarkdownString(part);
 
-				const folder = this.workspaceService.getWorkspaceFolders()?.at(0);
+				const folder = this.findRelevantWorkspaceFolder(workspaceFolders, textToApply.parts, i);
 				if (folder) {
 					content.baseUri = folder.path.endsWith('/') ? folder : folder.with({ path: folder.path + '/' });
 				}
@@ -272,5 +275,62 @@ export class ResponseStreamWithLinkification implements FinalizableChatResponseS
 				}
 			}
 		}
+	}
+
+	/**
+	 * Finds the workspace folder relevant to a string part by looking at the
+	 * surrounding location and symbol anchor parts in the linkified output, preferring anchors
+	 * that appear after the string part. This ensures correct
+	 * baseUri resolution in multi-root workspaces.
+	 *
+	 * If no matching workspace folder is found, `undefined` is returned and
+	 * `baseUri` will not be set on the markdown content.
+	 */
+	private findRelevantWorkspaceFolder(workspaceFolders: readonly Uri[], parts: readonly LinkifiedPart[], currentIndex: number): Uri | undefined {
+		if (workspaceFolders.length === 0) {
+			return undefined;
+		}
+
+		if (workspaceFolders.length === 1) {
+			return workspaceFolders[0];
+		}
+
+		// Look at nearby anchor parts to find one whose URI belongs to a workspace folder
+		for (let j = currentIndex + 1; j < parts.length; j++) {
+			const folder = this.getFolderFromPart(parts[j]);
+			if (folder) {
+				return folder;
+			}
+		}
+		for (let j = currentIndex - 1; j >= 0; j--) {
+			const folder = this.getFolderFromPart(parts[j]);
+			if (folder) {
+				return folder;
+			}
+		}
+
+		return undefined;
+	}
+
+	private getFolderFromPart(part: LinkifiedPart): Uri | undefined {
+		if (part instanceof LinkifyLocationAnchor) {
+			const uri = this.uriFromLocation(part.value);
+			if (uri) {
+				return this.workspaceService.getWorkspaceFolder(uri);
+			}
+		} else if (part instanceof LinkifySymbolAnchor) {
+			const uri = part.symbolInformation.location?.uri;
+			if (uri) {
+				return this.workspaceService.getWorkspaceFolder(uri);
+			}
+		}
+		return undefined;
+	}
+
+	private uriFromLocation(value: Uri | Location): Uri | undefined {
+		if ('uri' in value) {
+			return value.uri;
+		}
+		return value;
 	}
 }
