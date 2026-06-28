@@ -7,6 +7,7 @@ import { Emitter, Event } from '../../../../../base/common/event.js';
 import { Codicon } from '../../../../../base/common/codicons.js';
 import { Disposable, DisposableMap, DisposableStore, MutableDisposable } from '../../../../../base/common/lifecycle.js';
 import { Schemas } from '../../../../../base/common/network.js';
+import { ResourceMap } from '../../../../../base/common/map.js';
 import { autorun, constObservable, IObservable, IReader, ISettableObservable, observableFromEvent, observableValue, transaction } from '../../../../../base/common/observable.js';
 import { ThemeIcon } from '../../../../../base/common/themables.js';
 import { URI, UriComponents } from '../../../../../base/common/uri.js';
