@@ -5,7 +5,7 @@
 
 import { Emitter, Event } from '../../../../../base/common/event.js';
 import { Codicon } from '../../../../../base/common/codicons.js';
-import { Disposable, DisposableMap, MutableDisposable } from '../../../../../base/common/lifecycle.js';
+import { Disposable, DisposableMap, DisposableStore, MutableDisposable } from '../../../../../base/common/lifecycle.js';
 import { Schemas } from '../../../../../base/common/network.js';
 import { autorun, constObservable, IObservable, IReader, ISettableObservable, observableFromEvent, observableValue, transaction } from '../../../../../base/common/observable.js';
 import { ThemeIcon } from '../../../../../base/common/themables.js';
@@ -357,11 +357,20 @@ class LocalSession extends Disposable {
 	 * replace any prior subscription. Disposed automatically with the session.
 	 */
 	trackModel(model: IChatModel, onChange: () => void): void {
-		this._modelTracker.value = autorun(reader => {
+		const store = new DisposableStore();
+		store.add(autorun(reader => {
 			const inProgress = model.requestInProgress.read(reader);
 			this._status.set(inProgress ? SessionStatus.InProgress : SessionStatus.Completed, undefined);
 			onChange();
-		});
+		}));
+		// Also react to title changes from setCustomTitle (which fires
+		// model.onDidChange, not an observable signal).
+		store.add(model.onDidChange(e => {
+			if (e.kind === 'setCustomTitle') {
+				onChange();
+			}
+		}));
+		this._modelTracker.value = store;
 	}
 
 	setMode(mode: IChatMode | undefined): void {

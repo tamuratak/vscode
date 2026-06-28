@@ -816,8 +816,9 @@ export class AgentHostSessionAdapter extends Disposable implements ISession {
 				}
 				// title is already set to _customTitle by setCustomTitle; no-op
 				// unless it was externally cleared.
-				if (this.title.get() !== this._customTitle) {
-					this.title.set(this._customTitle, tx);
+				const customTitle = this._customTitle;
+				if (customTitle !== undefined && this.title.get() !== customTitle) {
+					this.title.set(customTitle, tx);
 					didChange = true;
 				}
 			} else if (summary !== undefined && summary !== this.title.get()) {

@@ -514,6 +514,12 @@ export class AgentSessionsModel extends Disposable implements IAgentSessionsMode
 		}
 		this.sessionStates = this.cache.loadSessionStates();
 
+		// Restore persisted renamed labels so that doResolveProvider can
+		// override stale provider labels across reloads.
+		for (const [resource, label] of this.cache.loadRenamedLabels()) {
+			this._renamedLabels.set(resource, label);
+		}
+
 		this.logger = this._register(this.instantiationService.createInstance(
 			AgentSessionsLogger,
 			() => ({
@@ -556,6 +562,7 @@ export class AgentSessionsModel extends Disposable implements IAgentSessionsMode
 		this._register(this.storageService.onWillSaveState(() => {
 			this.cache.saveCachedSessions(Array.from(this._sessions.values()));
 			this.cache.saveSessionStates(this.sessionStates);
+			this.cache.saveRenamedLabels(this._renamedLabels);
 		}));
 	}
 
@@ -694,12 +701,16 @@ export class AgentSessionsModel extends Disposable implements IAgentSessionsMode
 				const renamedLabel = this._renamedLabels.get(session.resource);
 				let effectiveLabel = providerRawLabel;
 				if (renamedLabel !== undefined) {
+					console.log(`[AgentSessionsModel] doResolveProvider: _renamedLabels has "${renamedLabel}" for ${session.resource.toString()}, provider has "${providerRawLabel}"`);
 					if (renamedLabel === providerRawLabel) {
 						// Provider caught up — clear the override.
 						this._renamedLabels.delete(session.resource);
 					} else {
 						effectiveLabel = renamedLabel;
+						console.log(`[AgentSessionsModel] doResolveProvider: using renamed label "${effectiveLabel}" instead of provider label "${providerRawLabel}"`);
 					}
+				} else {
+					console.log(`[AgentSessionsModel] doResolveProvider: _renamedLabels has NO entry for ${session.resource.toString()}, _renamedLabels.size=${this._renamedLabels.size}`);
 				}
 
 				sessions.set(session.resource, this.toAgentSession({
@@ -902,6 +913,8 @@ export class AgentSessionsModel extends Disposable implements IAgentSessionsMode
 		// Track the renamed label so that doResolveProvider preserves it
 		// when re-creating sessions from provider data.
 		this._renamedLabels.set(session.resource, label);
+		console.log(`[AgentSessionsModel] setLabel: _renamedLabels now has ${this._renamedLabels.size} entries, key=${session.resource.toString()}, value="${label}"`);
+		this.cache.saveRenamedLabels(this._renamedLabels);
 		this._onDidChangeSessions.fire();
 	}
 
@@ -1088,6 +1101,37 @@ class AgentSessionsCache {
 		}
 
 		return states;
+	}
+
+	//#endregion
+
+	//#region Renamed Labels
+
+	private static readonly RENAMED_LABELS_KEY = 'agentSessions.renamedLabels';
+
+	saveRenamedLabels(labels: ResourceMap<string>): void {
+		const serialized: Record<string, string> = {};
+		for (const [resource, label] of labels) {
+			serialized[resource.toString()] = label;
+		}
+		this.storageService.store(AgentSessionsCache.RENAMED_LABELS_KEY, JSON.stringify(serialized), StorageScope.WORKSPACE, StorageTarget.MACHINE);
+	}
+
+	loadRenamedLabels(): ResourceMap<string> {
+		const labels = new ResourceMap<string>();
+		const raw = this.storageService.get(AgentSessionsCache.RENAMED_LABELS_KEY, StorageScope.WORKSPACE);
+		if (!raw) {
+			return labels;
+		}
+		try {
+			const parsed = JSON.parse(raw) as Record<string, string>;
+			for (const [key, value] of Object.entries(parsed)) {
+				labels.set(URI.parse(key), value);
+			}
+		} catch {
+			// invalid data in storage, fallback to empty
+		}
+		return labels;
 	}
 
 	//#endregion

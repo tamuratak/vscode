@@ -693,6 +693,13 @@ export class RenameAgentSessionAction extends BaseAgentSessionAction {
 				} else {
 					chatService.setChatSessionTitle(session.resource, trimmedTitle);
 					console.log(`[RenameAction] setChatSessionTitle called`);
+					// Also notify the provider so its persisted title is
+					// updated and the sessions framework reflects the rename.
+					try {
+						await chatSessionsService.renameChatSession(session.resource, trimmedTitle, CancellationToken.None);
+					} catch {
+						// best-effort
+					}
 				}
 			}
 		}
