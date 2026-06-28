@@ -527,6 +527,7 @@ export class AgentSessionsControl extends Disposable implements IAgentSessionsCo
 		}));
 
 		this._register(model.onDidChangeSessions(() => {
+			console.log(`[AgentSessionsControl] onDidChangeSessions fired, visible=${this.visible}`);
 			if (this.visible) {
 				this.update();
 			}
@@ -790,7 +791,9 @@ export class AgentSessionsControl extends Disposable implements IAgentSessionsCo
 
 			this.hasPendingUpdate = false;
 			this.computeRecentRepositoryLabels();
+			console.log(`[AgentSessionsControl] update: calling updateChildren`);
 			await this.sessionsList?.updateChildren();
+			console.log(`[AgentSessionsControl] update: updateChildren done`);
 
 			this._onDidUpdate.fire();
 			return true;

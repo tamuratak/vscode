@@ -674,12 +674,26 @@ export class RenameAgentSessionAction extends BaseAgentSessionAction {
 		const chatService = accessor.get(IChatService);
 		const chatSessionsService = accessor.get(IChatSessionsService);
 
+		console.log(`[RenameAction] runWithSessions called, session.label="${session.label}", resource=${session.resource.toString()}`);
 		const title = await quickInputService.input({ prompt: localize('newChatTitle', "New agent session title"), value: session.label });
+		console.log(`[RenameAction] input returned: title="${title}"`);
 		if (title) {
-			if (isAgentHostAgentSessionItem(session)) {
-				await chatSessionsService.renameChatSession(session.resource, title, CancellationToken.None);
-			} else {
-				chatService.setChatSessionTitle(session.resource, title);
+			const trimmedTitle = title.trim();
+			if (trimmedTitle) {
+				console.log(`[RenameAction] calling setLabel("${trimmedTitle}"), isAgentHost=${isAgentHostAgentSessionItem(session)}`);
+				// Optimistically update the label in the model so the sidebar
+				// list reflects the new title immediately.
+				session.setLabel(trimmedTitle);
+				console.log(`[RenameAction] setLabel done, session.label is now "${session.label}"`);
+
+				if (isAgentHostAgentSessionItem(session)) {
+					console.log(`[RenameAction] calling chatSessionsService.renameChatSession(${session.resource.toString()}, "${trimmedTitle}")`);
+					await chatSessionsService.renameChatSession(session.resource, trimmedTitle, CancellationToken.None);
+					console.log(`[RenameAction] renameChatSession completed`);
+				} else {
+					chatService.setChatSessionTitle(session.resource, trimmedTitle);
+					console.log(`[RenameAction] setChatSessionTitle called`);
+				}
 			}
 		}
 	}

@@ -134,6 +134,7 @@ suite('GrowthSessionOpenerParticipant', () => {
 			isRead: () => true,
 			isMarkedUnread: () => false,
 			setRead: () => { },
+			setLabel: () => { },
 		};
 
 		// The participant checks providerType before touching the accessor,

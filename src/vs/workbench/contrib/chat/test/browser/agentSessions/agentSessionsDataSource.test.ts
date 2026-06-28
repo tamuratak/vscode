@@ -118,6 +118,7 @@ suite('AgentSessionsDataSource', () => {
 			isRead: () => overrides.isRead ?? true,
 			isMarkedUnread: () => false,
 			setRead: () => { },
+			setLabel: () => { },
 		};
 	}
 
@@ -1237,6 +1238,7 @@ suite('AgentSessionsSorter', () => {
 			isRead: () => true,
 			isMarkedUnread: () => false,
 			setRead: () => { },
+			setLabel: () => { },
 		};
 	}
 
@@ -1379,6 +1381,7 @@ suite('AgentSessionsPicker', () => {
 			isRead: () => true,
 			isMarkedUnread: () => false,
 			setRead: () => { },
+			setLabel: () => { },
 		};
 	}
 
@@ -1437,6 +1440,7 @@ suite('groupAgentSessionsByDate with sortBy', () => {
 			isRead: () => true,
 			isMarkedUnread: () => false,
 			setRead: () => { },
+			setLabel: () => { },
 		};
 	}
 

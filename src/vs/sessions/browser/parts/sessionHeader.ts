@@ -415,6 +415,9 @@ export class SessionHeader extends Disposable {
 			const newTitle = input.value.trim();
 			this._endTitleEditing();
 			if (commit && newTitle && newTitle !== initialTitle) {
+				// Optimistically update the title text so the user sees the
+				// new title immediately, before the async rename settles.
+				this._titleTextEl.textContent = newTitle;
 				this._sessionsManagementService
 					.renameSession(session, newTitle)
 					.catch(onUnexpectedError);

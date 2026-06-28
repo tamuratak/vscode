@@ -204,6 +204,7 @@ function createProvider(disposables: DisposableStore, connection: MockAgentConne
 	instantiationService.stub(IChatSessionsService, {
 		getChatSessionContribution: () => ({ type: 'remote-test-copilot', name: 'test', displayName: 'Test', description: 'test', icon: undefined }),
 		getOrCreateChatSession: async () => ({ onWillDispose: () => ({ dispose() { } }), sessionResource: URI.from({ scheme: 'test' }), history: [], dispose() { } }),
+		renameChatSession: async () => { },
 	});
 	instantiationService.stub(IChatService, {
 		acquireOrLoadSession: async () => undefined,

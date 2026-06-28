@@ -324,6 +324,7 @@ function createProvider(disposables: DisposableStore, agentHostService: MockAgen
 		getChatSessionContribution: (chatSessionType: string) => contributions.find(c => c.type === chatSessionType),
 		getAllChatSessionContributions: () => contributions,
 		getOrCreateChatSession: async () => ({ onWillDispose: () => ({ dispose() { } }), sessionResource: URI.from({ scheme: 'test' }), history: [], dispose() { } }),
+		renameChatSession: async () => { },
 	});
 	instantiationService.stub(IChatService, {
 		acquireOrLoadSession: options?.acquireOrLoadSession ?? (async () => undefined),

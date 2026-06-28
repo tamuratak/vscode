@@ -659,7 +659,8 @@ suite('AgentSessions', () => {
 				setPinned: pinned => { },
 				isRead: () => false,
 				isMarkedUnread: () => false,
-				setRead: read => { }
+				setRead: read => { },
+				setLabel: label => { }
 			};
 
 			const remoteSession: IAgentSession = {
@@ -677,7 +678,8 @@ suite('AgentSessions', () => {
 				setPinned: pinned => { },
 				isRead: () => false,
 				isMarkedUnread: () => false,
-				setRead: read => { }
+				setRead: read => { },
+				setLabel: label => { }
 			};
 
 			assert.strictEqual(isLocalAgentSessionItem(localSession), true);
@@ -700,7 +702,8 @@ suite('AgentSessions', () => {
 				setPinned: pinned => { },
 				isRead: () => false,
 				isMarkedUnread: () => false,
-				setRead: read => { }
+				setRead: read => { },
+				setLabel: label => { }
 			};
 
 			// Test with a session object
@@ -727,7 +730,8 @@ suite('AgentSessions', () => {
 				setPinned: pinned => { },
 				isRead: () => false,
 				isMarkedUnread: () => false,
-				setRead: read => { }
+				setRead: read => { },
+				setLabel: label => { }
 			};
 
 			// Test with actual view model
@@ -767,6 +771,7 @@ suite('AgentSessions', () => {
 				isRead: () => false,
 				isMarkedUnread: () => false,
 				setRead: read => { },
+				setLabel: label => { },
 				...overrides
 			};
 		}

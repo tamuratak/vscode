@@ -626,11 +626,16 @@ export class CopilotCLISessionService extends Disposable implements ICopilotCLIS
 	 * via the wrapper-only fallback in `_getAllSessions()` / `constructSessionItemFromWrappedSession()`.
 	 */
 	private async getSessionTitleImpl(sessionId: string, metadata: LocalSessionMetadata | undefined, token: CancellationToken): Promise<string> {
-		const explicitTitle =
-			this._sessionWrappers.get(sessionId)?.object.title ??
-			metadata?.name ??
-			await this.customSessionTitleService.getCustomSessionTitle(sessionId);
+		// Custom title (set by the user via rename) takes highest precedence
+		// because it is the authoritative user-chosen name.  The wrapper's
+		// title and SDK metadata name may lag behind when the SDK's async
+		// title_changed event has not yet been delivered.
+		const customTitle = await this.customSessionTitleService.getCustomSessionTitle(sessionId);
+		const wrapperTitle = this._sessionWrappers.get(sessionId)?.object.title;
+		const metadataName = metadata?.name;
+		const explicitTitle = customTitle ?? wrapperTitle ?? metadataName;
 		if (explicitTitle) {
+			console.log(`[CopilotCLISessionService] getSessionTitleImpl(${sessionId}): explicitTitle="${explicitTitle}" (customTitle=${customTitle}, wrapperTitle=${wrapperTitle}, metadataName=${metadataName})`);
 			return explicitTitle;
 		}
 
@@ -1466,9 +1471,15 @@ export class CopilotCLISessionService extends Disposable implements ICopilotCLIS
 	}
 
 	public async renameSession(sessionId: string, title: string): Promise<void> {
+		console.log(`[CopilotCLISessionService] renameSession: sessionId="${sessionId}", title="${title}"`);
 		await this.updateSdkSessionMetadata(sessionId, title, sdkSession => sdkSession.renameSession(title));
+		// Persist the renamed title in the metadata store so that
+		// getSessionTitleImpl resolves it even when the SDK's title_changed
+		// event has not yet fired (or the wrapper is stale).
+		await this.customSessionTitleService.setCustomSessionTitle(sessionId, title);
 		this._sessionLabels.delete(sessionId);
 		this._onDidChangeSessions.fire();
+		console.log(`[CopilotCLISessionService] renameSession done: sessionId="${sessionId}"`);
 	}
 
 	public async updateSessionSummary(sessionId: string, title: string): Promise<void> {

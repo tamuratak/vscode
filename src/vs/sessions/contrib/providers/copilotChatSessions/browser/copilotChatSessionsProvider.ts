@@ -951,6 +951,14 @@ class AgentSessionAdapter implements ICopilotChatSession {
 	private readonly _title: ReturnType<typeof observableValue<string>>;
 	readonly title: IObservable<string>;
 
+	/**
+	 * When set, this title was explicitly chosen by the user (via rename) and
+	 * must not be overwritten by {@link update} from the stale
+	 * `IAgentSession.label`.  Cleared when the extension-host eventually
+	 * delivers a matching label through the normal refresh cycle.
+	 */
+	private _customTitle: string | undefined;
+
 	private readonly _updatedAt: ReturnType<typeof observableValue<Date>>;
 	readonly updatedAt: IObservable<Date>;
 
@@ -1075,7 +1083,18 @@ class AgentSessionAdapter implements ICopilotChatSession {
 	update(session: IAgentSession): boolean {
 		let changed = false;
 		transaction(tx => {
-			changed = setIfChanged(this._title, session.label, tx) || changed;
+			// If the user explicitly renamed this session, use the custom
+			// title instead of the stale label from IAgentSession.  Clear
+			// the override once the label catches up to the custom title
+			// (meaning the extension-host has persisted the rename).
+			if (this._customTitle !== undefined) {
+				if (session.label === this._customTitle) {
+					this._customTitle = undefined;
+				}
+				changed = setIfChanged(this._title, this._customTitle ?? session.label, tx) || changed;
+			} else {
+				changed = setIfChanged(this._title, session.label, tx) || changed;
+			}
 			changed = setIfChanged(this._workspace, this._buildWorkspace(session), tx, sessionWorkspaceEqual) || changed;
 			const updatedTime = session.timing.lastRequestEnded ?? session.timing.lastRequestStarted ?? session.timing.created;
 			changed = setIfChanged(this._updatedAt, new Date(updatedTime), tx, dateEquals) || changed;
@@ -1089,6 +1108,18 @@ class AgentSessionAdapter implements ICopilotChatSession {
 			changed = setIfChanged(this._baseGitHubInfo, this._extractGitHubInfo(session), tx, gitHubInfoEqual) || changed;
 		});
 		return changed;
+	}
+
+	/**
+	 * Set a user-chosen title that persists across cache refreshes until the
+	 * extension-host label catches up.  The per-adapter override is cleared
+	 * when {@link update} sees a matching label, but the provider-level
+	 * {@link CopilotChatSessionsProvider._customTitles} map keeps the title
+	 * alive across adapter replacement.
+	 */
+	setCustomTitle(title: string): void {
+		this._customTitle = title;
+		this._title.set(title, undefined);
 	}
 
 	private _getSessionTypeIcon(session: IAgentSession): ThemeIcon {
@@ -1409,6 +1440,14 @@ export class CopilotChatSessionsProvider extends Disposable implements ISessions
 
 	/** Cache of adapted sessions, keyed by resource URI string. */
 	private readonly _sessionCache = new Map<string, AgentSessionAdapter | CopilotCLISession | RemoteNewSession | ClaudeCodeNewSession>();
+
+	/**
+	 * Custom titles set by the user via rename, keyed by resource URI string.
+	 * Unlike per-adapter `_customTitle`, this survives adapter replacement
+	 * when {@link _refreshSessionCache} removes and re-adds a session
+	 * (e.g. during a model re-resolve).
+	 */
+	private readonly _customTitles = new Map<string, string>();
 
 	/**
 	 * Resources of committed sessions that are currently in-flight (i.e.
@@ -1817,6 +1856,14 @@ export class CopilotChatSessionsProvider extends Disposable implements ISessions
 			return;
 		}
 
+		// Clean up custom titles for all sessions being deleted
+		for (const chatId of allChatIds) {
+			const chat = this._findChatSession(chatId);
+			if (chat) {
+				this._customTitles.delete(chat.resource.toString());
+			}
+		}
+
 		await this._deleteAgentSessions(agentSessions);
 
 		this._sessionGroupCache.delete(sessionId);
@@ -1833,19 +1880,57 @@ export class CopilotChatSessionsProvider extends Disposable implements ISessions
 		const agentSession = this.agentSessionsService.getSession(chatUri);
 		if (agentSession?.providerType === CopilotCLISessionType.id) {
 			await this.commandService.executeCommand('github.copilot.cli.sessions.setTitle', { resource: chatUri }, title);
-			return;
-		}
-		if (agentSession?.providerType === AgentSessionProviders.Claude) {
+		} else if (agentSession?.providerType === AgentSessionProviders.Claude) {
 			await this.commandService.executeCommand('github.copilot.claude.sessions.rename', { resource: chatUri }, title);
-			return;
+		} else {
+			throw new Error('Renaming is not supported for this session type');
 		}
-		throw new Error('Renaming is not supported for this session type');
+
+		// Also notify the workbench so the sidebar's AgentSessionsModel
+		// picks up the rename immediately. The command above has already
+		// completed, so the extension host's controller will return the
+		// updated title when doResolveProvider re-fetches items.
+		try {
+			console.log(`[CopilotChatSessionsProvider] renameChat: calling chatSessionsService.renameChatSession(${chatUri.toString()}, "${title}")`);
+			await this.chatSessionsService.renameChatSession(chatUri, title, CancellationToken.None);
+			console.log(`[CopilotChatSessionsProvider] renameChat: chatSessionsService.renameChatSession succeeded`);
+		} catch (e) {
+			console.log(`[CopilotChatSessionsProvider] renameChat: chatSessionsService.renameChatSession failed: ${e}`);
+		}
+
+		// Update the cached session title so the sessions list reflects the
+		// rename immediately without waiting for the next _refreshSessionCache
+		// cycle (which reads from agentSessionsService and would overwrite the
+		// title with the stale IAgentSession.label).
+		const cacheKey = chatUri.toString();
+		this._customTitles.set(cacheKey, title);
+		const cachedSession = this._sessionCache.get(cacheKey);
+		if (cachedSession instanceof AgentSessionAdapter) {
+			cachedSession.setCustomTitle(title);
+			// Invalidate the group cache so _chatToSession produces a fresh
+			// ISession wrapper — the sessions list diffs by object reference
+			// and would otherwise miss the title change on the reused object.
+			const groupId = this._getGroupIdForChat(cachedSession);
+			this._sessionGroupCache.delete(groupId);
+			this._invalidateGroupingCaches();
+			this._onDidChangeSessions.fire({
+				added: [], removed: [], changed: [this._chatToSession(cachedSession)]
+			});
+		} else if (cachedSession) {
+			(cachedSession.title as ISettableObservable<string>).set(title, undefined);
+			this._onDidChangeSessions.fire({
+				added: [], removed: [], changed: [this._chatToSession(cachedSession)]
+			});
+		}
 	}
 
 	async renameSession(sessionId: string, title: string): Promise<void> {
-		const session = this._findSession(sessionId);
-		if (session) {
-			await this.renameChat(sessionId, session.mainChat.get().resource, title);
+		// Use _findChatSession (which searches _sessionCache) instead of
+		// _findSession (which only searches _sessionGroupCache) so that
+		// rename works in both single-chat and multi-chat modes.
+		const chat = this._findChatSession(sessionId);
+		if (chat) {
+			await this.renameChat(sessionId, chat.resource, title);
 		}
 	}
 
@@ -2627,6 +2712,7 @@ export class CopilotChatSessionsProvider extends Disposable implements ISessions
 
 		const key = chatSession.resource.toString();
 		this._sessionCache.delete(key);
+		this._customTitles.delete(key);
 		this._invalidateGroupingCaches();
 		this._sessionGroupCache.delete(chatSession.sessionId);
 		if (this._newSessions.has(chatSession.sessionId)) {
@@ -2667,6 +2753,12 @@ export class CopilotChatSessionsProvider extends Disposable implements ISessions
 				}
 			} else {
 				const adapter = new AgentSessionAdapter(session, this.id, this.gitHubService);
+				// Apply any user-set custom title so the adapter doesn't
+				// start with the stale label from the model.
+				const customTitle = this._customTitles.get(key);
+				if (customTitle !== undefined) {
+					adapter.setCustomTitle(customTitle);
+				}
 				this._sessionCache.set(key, adapter);
 				addedData.push(adapter);
 				cacheChanged = true;

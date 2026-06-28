@@ -178,6 +178,7 @@ function createProviderWithConfig(
 		setSessionOption: () => true,
 		getSessionOption: () => undefined,
 		onDidChangeOptionGroups: Event.None,
+		renameChatSession: async () => { },
 	});
 	instantiationService.stub(IChatService, {
 		acquireOrLoadSession: async () => undefined,
@@ -251,6 +252,7 @@ function createProviderForSendTests(
 		getSessionOption: () => undefined,
 		onDidChangeOptionGroups: Event.None,
 		createNewChatSessionItem: opts?.createNewChatSessionItem ?? (async () => undefined),
+		renameChatSession: async () => { },
 	});
 	instantiationService.stub(IChatService, {
 		acquireOrLoadSession: async () => undefined,

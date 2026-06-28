@@ -132,6 +132,13 @@ export interface IAgentSession extends IAgentSessionData {
 	isRead(): boolean;
 	isMarkedUnread(): boolean;
 	setRead(read: boolean): void;
+
+	/**
+	 * Update the display label for this session (e.g. after a user rename).
+	 * Fires {@link IAgentSessionsModel.onDidChangeSessions} so that any
+	 * listening UI (sidebar list, tab titles, etc.) refreshes immediately.
+	 */
+	setLabel(label: string): void;
 }
 
 interface IInternalAgentSessionData extends IAgentSessionData {
@@ -166,7 +173,8 @@ export function isAgentSession(obj: unknown): obj is IAgentSession {
 		&& typeof session.setPinned === 'function'
 		&& typeof session.isRead === 'function'
 		&& typeof session.isMarkedUnread === 'function'
-		&& typeof session.setRead === 'function';
+		&& typeof session.setRead === 'function'
+		&& typeof session.setLabel === 'function';
 }
 
 export function isAgentSessionsModel(obj: unknown): obj is IAgentSessionsModel {
@@ -470,6 +478,15 @@ export class AgentSessionsModel extends Disposable implements IAgentSessionsMode
 	private _sessions: ResourceMap<IInternalAgentSession>;
 	get sessions(): IAgentSession[] { return Array.from(this._sessions.values()); }
 
+	/**
+	 * Tracks labels explicitly set by the user via {@link setLabel}. When
+	 * `doResolveProvider` re-creates session objects from provider data,
+	 * these labels take precedence so that renames survive refreshes.
+	 * Entries are cleared once the provider eventually returns a matching
+	 * title (meaning the rename was persisted server-side).
+	 */
+	private readonly _renamedLabels = new ResourceMap<string>();
+
 	private readonly resolvers = this._register(new DisposableMap<string, ThrottledDelayer<void>>());
 
 	private readonly cache: AgentSessionsCache;
@@ -527,6 +544,7 @@ export class AgentSessionsModel extends Disposable implements IAgentSessionsMode
 				changedChatSessionTypes.add(getChatSessionType(resource));
 			}
 
+			console.log(`[AgentSessionsModel] onDidChangeSessionItems: changedChatSessionTypes=[${[...changedChatSessionTypes].join(', ')}]`);
 			for (const chatSessionType of changedChatSessionTypes) {
 				this.resolveProvider(chatSessionType, { refreshProvider: false /* skip because we react on an event already */ });
 			}
@@ -613,6 +631,7 @@ export class AgentSessionsModel extends Disposable implements IAgentSessionsMode
 	}
 
 	private async doResolveProvider(provider: string, options: { refreshProvider: boolean }, token: CancellationToken): Promise<void> {
+		console.log(`[AgentSessionsModel] doResolveProvider: provider="${provider}", refreshProvider=${options.refreshProvider}`);
 		if (options.refreshProvider) {
 			await this.chatSessionsService.refreshChatSessionItems([provider], token);
 
@@ -657,16 +676,37 @@ export class AgentSessionsModel extends Disposable implements IAgentSessionsMode
 					icon = session.iconPath ?? Codicon.terminal;
 				}
 
+				// Log if this is replacing an existing session with a different label
+				const existing = this._sessions.get(session.resource);
+				if (existing && existing.label !== session.label.split('\n')[0]) {
+					console.log(`[AgentSessionsModel] doResolveProvider: session ${session.resource.toString()} label changing "${existing.label}" -> "${session.label.split('\n')[0]}"`);
+				}
+
 				const changes = session.changes;
 				const normalizedChanges = changes && !(changes instanceof Array)
 					? { files: changes.files, insertions: changes.insertions, deletions: changes.deletions }
 					: changes;
 
+				// Use the user-renamed label if available; otherwise use the
+				// provider's label.  Clear the override once the provider
+				// catches up (returns the same title).
+				const providerRawLabel = session.label.split('\n')[0];
+				const renamedLabel = this._renamedLabels.get(session.resource);
+				let effectiveLabel = providerRawLabel;
+				if (renamedLabel !== undefined) {
+					if (renamedLabel === providerRawLabel) {
+						// Provider caught up — clear the override.
+						this._renamedLabels.delete(session.resource);
+					} else {
+						effectiveLabel = renamedLabel;
+					}
+				}
+
 				sessions.set(session.resource, this.toAgentSession({
 					providerType: chatSessionType,
 					providerLabel,
 					resource: session.resource,
-					label: session.label.split('\n')[0], // protect against weird multi-line labels that break our layout
+					label: effectiveLabel,
 					description: session.description,
 					icon,
 					badge: session.badge,
@@ -705,6 +745,9 @@ export class AgentSessionsModel extends Disposable implements IAgentSessionsMode
 	private toAgentSession(data: IInternalAgentSessionData): IInternalAgentSession {
 		return {
 			...data,
+			// Use a getter so that mutations via setLabel (which writes
+			// data.label) are immediately visible through session.label.
+			get label() { return data.label; },
 			isArchived: () => this.isArchived(data),
 			setArchived: (archived: boolean) => this.setArchived(data, archived),
 			isPinned: () => this.isPinned(data),
@@ -712,6 +755,7 @@ export class AgentSessionsModel extends Disposable implements IAgentSessionsMode
 			isRead: () => this.isRead(data),
 			isMarkedUnread: () => this.isMarkedUnread(data),
 			setRead: (read: boolean) => this.setRead(data, read),
+			setLabel: (label: string) => this.setLabel(data, label),
 		};
 	}
 
@@ -845,6 +889,20 @@ export class AgentSessionsModel extends Disposable implements IAgentSessionsMode
 		if (!skipEvent) {
 			this._onDidChangeSessions.fire();
 		}
+	}
+
+	private setLabel(session: IInternalAgentSessionData, label: string): void {
+		if (label === session.label) {
+			return;
+		}
+		console.log(`[AgentSessionsModel] setLabel: "${session.label}" -> "${label}"`);
+		// The data object is mutable in practice; the readonly modifier on
+		// IAgentSessionData.label is a public-API surface constraint.
+		(session as { label: string }).label = label;
+		// Track the renamed label so that doResolveProvider preserves it
+		// when re-creating sessions from provider data.
+		this._renamedLabels.set(session.resource, label);
+		this._onDidChangeSessions.fire();
 	}
 
 	private static readonly READ_DATE_BASELINE_KEY = 'agentSessions.readDateBaseline2';

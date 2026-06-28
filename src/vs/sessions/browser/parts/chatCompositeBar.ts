@@ -35,6 +35,7 @@ interface IChatTab {
 	readonly chat: IChat;
 	readonly element: HTMLElement;
 	readonly inputContainer: HTMLElement;
+	readonly labelEl: HTMLElement;
 }
 
 /**
@@ -327,7 +328,7 @@ export class ChatCompositeBar extends Disposable {
 
 		this._tabsContainer.appendChild(tab);
 
-		const chatTab: IChatTab = { chat, element: tab, inputContainer };
+		const chatTab: IChatTab = { chat, element: tab, inputContainer, labelEl };
 
 		this._tabDisposables.add(addDisposableListener(tab, EventType.CLICK, () => {
 			// Cancel any in-progress rename before switching to the clicked tab.
@@ -427,6 +428,9 @@ export class ChatCompositeBar extends Disposable {
 			const newTitle = inputBox.value.trim();
 			this._endTabEditing();
 			if (commit && newTitle && newTitle !== initialTitle) {
+				// Optimistically update the tab label so the user sees the
+				// new title immediately, before the async rename settles.
+				chatTab.labelEl.textContent = newTitle;
 				this._sessionsManagementService
 					.renameChat(session, chat.resource, newTitle)
 					.catch(onUnexpectedError);

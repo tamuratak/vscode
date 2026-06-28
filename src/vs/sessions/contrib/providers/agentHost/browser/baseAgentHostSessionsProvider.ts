@@ -286,6 +286,14 @@ export class AgentHostSessionAdapter extends Disposable implements ISession {
 	readonly capabilities: ISessionCapabilities;
 
 	/**
+	 * When set, this title was explicitly chosen by the user (via rename) and
+	 * must not be overwritten by {@link update} from the stale
+	 * `metadata.summary`.  Cleared when the agent-host eventually delivers a
+	 * matching summary through the normal refresh cycle.
+	 */
+	private _customTitle: string | undefined;
+
+	/**
 	 * The default chat (resource == this session's resource). Always present;
 	 * for single-chat sessions it is the only chat and `chats === [it]`.
 	 */
@@ -664,6 +672,12 @@ export class AgentHostSessionAdapter extends Disposable implements ISession {
 			: this.mode.get();
 	}
 
+	/** Set a user-chosen title that persists across metadata refreshes. */
+	setCustomTitle(title: string): void {
+		this._customTitle = title;
+		this.title.set(title, undefined);
+	}
+
 	/** Optimistically set the default chat tab title (independent of the session title). */
 	setDefaultChatTitle(title: string): void {
 		this._defaultChatTitleOverride.set(title || undefined, undefined);
@@ -794,7 +808,19 @@ export class AgentHostSessionAdapter extends Disposable implements ISession {
 
 		transaction(tx => {
 			const summary = metadata.summary;
-			if (summary !== undefined && summary !== this.title.get()) {
+			if (this._customTitle !== undefined) {
+				// User explicitly renamed this session — keep the custom title
+				// until the agent-host summary catches up.
+				if (summary === this._customTitle) {
+					this._customTitle = undefined;
+				}
+				// title is already set to _customTitle by setCustomTitle; no-op
+				// unless it was externally cleared.
+				if (this.title.get() !== this._customTitle) {
+					this.title.set(this._customTitle, tx);
+					didChange = true;
+				}
+			} else if (summary !== undefined && summary !== this.title.get()) {
 				this.title.set(summary, tx);
 				didChange = true;
 			}
@@ -1457,6 +1483,13 @@ export abstract class BaseAgentHostSessionsProvider extends Disposable implement
 
 	/** Cache of adapted sessions, keyed by raw session ID. */
 	protected readonly _sessionCache = new Map<string, AgentHostSessionAdapter>();
+
+	/**
+	 * Custom titles set by the user via rename, keyed by raw session ID.
+	 * Unlike per-adapter `_customTitle`, this survives adapter replacement
+	 * when the session cache is rebuilt.
+	 */
+	protected readonly _customTitles = new Map<string, string>();
 
 	/**
 	 * Temporary session that has been sent (first turn dispatched) but not yet
@@ -2442,6 +2475,7 @@ export abstract class BaseAgentHostSessionsProvider extends Disposable implement
 		for (const { rawId, sessionId, cached } of targets) {
 			await connection.disposeSession(AgentSession.uri(cached.agentProvider, rawId));
 			this._sessionCache.delete(rawId);
+			this._customTitles.delete(rawId);
 			this._runningSessionConfigs.delete(sessionId);
 			this._runningSessionConfigResolveSeq.delete(sessionId);
 		}
@@ -2481,11 +2515,23 @@ export abstract class BaseAgentHostSessionsProvider extends Disposable implement
 		const cached = rawId ? this._sessionCache.get(rawId) : undefined;
 		const connection = this.connection;
 		if (cached && rawId && connection) {
-			cached.title.set(title, undefined);
+			console.log(`[BaseAgentHostProvider] renameSession: rawId="${rawId}", title="${title}", resource=${cached.resource.toString()}`);
+			this._customTitles.set(rawId, title);
+			cached.setCustomTitle(title);
 			this._onDidChangeSessions.fire({ added: [], removed: [], changed: [cached] });
 			const sessionUri = AgentSession.uri(cached.agentProvider, rawId);
 			const action = { type: ActionType.SessionTitleChanged as const, title };
 			connection.dispatch(sessionUri.toString(), action);
+
+			// Also notify the workbench so the sidebar's AgentSessionsModel
+			// picks up the rename without waiting for the agent host to
+			// process the dispatch and fire onDidChangeSessionItems.
+			try {
+				await this._chatSessionsService.renameChatSession(cached.resource, title, CancellationToken.None);
+				console.log(`[BaseAgentHostProvider] renameSession: chatSessionsService.renameChatSession succeeded`);
+			} catch (e) {
+				console.log(`[BaseAgentHostProvider] renameSession: chatSessionsService.renameChatSession failed: ${e}`);
+			}
 		}
 	}
 
@@ -3154,6 +3200,10 @@ export abstract class BaseAgentHostSessionsProvider extends Disposable implement
 					}
 				} else {
 					const cached = this.createAdapter(meta);
+					const customTitle = this._customTitles.get(rawId);
+					if (customTitle !== undefined) {
+						cached.setCustomTitle(customTitle);
+					}
 					this._sessionCache.set(rawId, cached);
 					added.push(cached);
 				}
@@ -3169,6 +3219,7 @@ export abstract class BaseAgentHostSessionsProvider extends Disposable implement
 						continue;
 					}
 					this._sessionCache.delete(key);
+					this._customTitles.delete(key);
 					this._runningSessionConfigs.delete(cached.sessionId);
 					this._runningSessionConfigResolveSeq.delete(cached.sessionId);
 					removed.push(cached);
@@ -3323,6 +3374,10 @@ export abstract class BaseAgentHostSessionsProvider extends Disposable implement
 			isArchived: !!(summary.status & ProtocolSessionStatus.IsArchived),
 		};
 		const cached = this.createAdapter(meta);
+		const customTitle = this._customTitles.get(rawId);
+		if (customTitle !== undefined) {
+			cached.setCustomTitle(customTitle);
+		}
 		this._sessionCache.set(rawId, cached);
 		this._onDidChangeSessions.fire({ added: [cached], removed: [], changed: [] });
 	}
@@ -3332,6 +3387,7 @@ export abstract class BaseAgentHostSessionsProvider extends Disposable implement
 		const cached = this._sessionCache.get(rawId);
 		if (cached) {
 			this._sessionCache.delete(rawId);
+			this._customTitles.delete(rawId);
 			this._runningSessionConfigs.delete(cached.sessionId);
 			this._runningSessionConfigResolveSeq.delete(cached.sessionId);
 			this._sessionStateIdleTimers.deleteAndDispose(cached.sessionId);

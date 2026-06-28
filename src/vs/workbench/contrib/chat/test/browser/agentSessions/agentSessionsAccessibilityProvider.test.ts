@@ -44,6 +44,7 @@ suite('AgentSessionsAccessibilityProvider', () => {
 			isRead: () => true,
 			isMarkedUnread: () => false,
 			setRead: () => { },
+			setLabel: () => { },
 		};
 	}
 
