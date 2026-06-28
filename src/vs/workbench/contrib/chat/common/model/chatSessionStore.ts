@@ -504,7 +504,10 @@ export class ChatSessionStore extends Disposable {
 		await this.storeQueue.queue(async () => {
 			const index = this.internalGetIndex();
 			if (index.entries[sessionId]) {
+				console.log(`[ChatSessionStore] setSessionTitle: "${index.entries[sessionId].title}" -> "${title}" for ${sessionId}`);
 				index.entries[sessionId].title = title;
+			} else {
+				console.log(`[ChatSessionStore] setSessionTitle: NO index entry for ${sessionId}`);
 			}
 		});
 	}
@@ -628,7 +631,23 @@ export class ChatSessionStore extends Disposable {
 	public async readSession(sessionId: string): Promise<ISerializedChatDataReference | undefined> {
 		return await this.storeQueue.queue(async () => {
 			const storageLocation = this.getStorageLocation(sessionId);
-			return this.readSessionFromLocation(storageLocation.flat, storageLocation.log, sessionId);
+			const result = await this.readSessionFromLocation(storageLocation.flat, storageLocation.log, sessionId);
+			if (result) {
+				// Apply the title from the index if it differs from the
+				// file data. This ensures that renames made via
+				// setSessionTitle (which only updates the index) are
+				// reflected when the model is next loaded from disk.
+				const indexTitle = this.internalGetIndex().entries[sessionId]?.title;
+				const fileTitle = (result.value as ISerializableChatData).customTitle;
+				console.log(`[ChatSessionStore] readSession: sessionId=${sessionId}, indexTitle="${indexTitle}", fileTitle="${fileTitle}"`);
+				if (indexTitle && indexTitle !== fileTitle) {
+					console.log(`[ChatSessionStore] readSession: OVERRIDING customTitle "${fileTitle}" -> "${indexTitle}"`);
+					(result.value as ISerializableChatData).customTitle = indexTitle;
+				}
+			} else {
+				console.log(`[ChatSessionStore] readSession: no result for sessionId=${sessionId}`);
+			}
+			return result;
 		});
 	}
 

@@ -328,7 +328,9 @@ export class SessionHeader extends Disposable {
 		this._statusIcon.setStatus(status, isRead, isArchived);
 
 		// Session title
-		this._titleTextEl.textContent = session.title.read(reader) || localize('agentSessions.newSession', "New Session");
+		const titleValue = session.title.read(reader);
+		console.log(`[SessionHeader] _updateHeader: title="${titleValue}" for ${session.resource.toString()}`);
+		this._titleTextEl.textContent = titleValue || localize('agentSessions.newSession', "New Session");
 		this._titleEl.classList.toggle('editable', this._isTitleEditable());
 
 		// Meta row: contributed action pills (workspace folder · diff stats · pull request).

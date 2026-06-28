@@ -550,7 +550,6 @@ export class AgentSessionsModel extends Disposable implements IAgentSessionsMode
 				changedChatSessionTypes.add(getChatSessionType(resource));
 			}
 
-			console.log(`[AgentSessionsModel] onDidChangeSessionItems: changedChatSessionTypes=[${[...changedChatSessionTypes].join(', ')}]`);
 			for (const chatSessionType of changedChatSessionTypes) {
 				this.resolveProvider(chatSessionType, { refreshProvider: false /* skip because we react on an event already */ });
 			}
@@ -638,7 +637,6 @@ export class AgentSessionsModel extends Disposable implements IAgentSessionsMode
 	}
 
 	private async doResolveProvider(provider: string, options: { refreshProvider: boolean }, token: CancellationToken): Promise<void> {
-		console.log(`[AgentSessionsModel] doResolveProvider: provider="${provider}", refreshProvider=${options.refreshProvider}`);
 		if (options.refreshProvider) {
 			await this.chatSessionsService.refreshChatSessionItems([provider], token);
 
@@ -683,12 +681,6 @@ export class AgentSessionsModel extends Disposable implements IAgentSessionsMode
 					icon = session.iconPath ?? Codicon.terminal;
 				}
 
-				// Log if this is replacing an existing session with a different label
-				const existing = this._sessions.get(session.resource);
-				if (existing && existing.label !== session.label.split('\n')[0]) {
-					console.log(`[AgentSessionsModel] doResolveProvider: session ${session.resource.toString()} label changing "${existing.label}" -> "${session.label.split('\n')[0]}"`);
-				}
-
 				const changes = session.changes;
 				const normalizedChanges = changes && !(changes instanceof Array)
 					? { files: changes.files, insertions: changes.insertions, deletions: changes.deletions }
@@ -701,16 +693,12 @@ export class AgentSessionsModel extends Disposable implements IAgentSessionsMode
 				const renamedLabel = this._renamedLabels.get(session.resource);
 				let effectiveLabel = providerRawLabel;
 				if (renamedLabel !== undefined) {
-					console.log(`[AgentSessionsModel] doResolveProvider: _renamedLabels has "${renamedLabel}" for ${session.resource.toString()}, provider has "${providerRawLabel}"`);
 					if (renamedLabel === providerRawLabel) {
 						// Provider caught up — clear the override.
 						this._renamedLabels.delete(session.resource);
 					} else {
 						effectiveLabel = renamedLabel;
-						console.log(`[AgentSessionsModel] doResolveProvider: using renamed label "${effectiveLabel}" instead of provider label "${providerRawLabel}"`);
 					}
-				} else {
-					console.log(`[AgentSessionsModel] doResolveProvider: _renamedLabels has NO entry for ${session.resource.toString()}, _renamedLabels.size=${this._renamedLabels.size}`);
 				}
 
 				sessions.set(session.resource, this.toAgentSession({
@@ -906,14 +894,12 @@ export class AgentSessionsModel extends Disposable implements IAgentSessionsMode
 		if (label === session.label) {
 			return;
 		}
-		console.log(`[AgentSessionsModel] setLabel: "${session.label}" -> "${label}"`);
 		// The data object is mutable in practice; the readonly modifier on
 		// IAgentSessionData.label is a public-API surface constraint.
 		(session as { label: string }).label = label;
 		// Track the renamed label so that doResolveProvider preserves it
 		// when re-creating sessions from provider data.
 		this._renamedLabels.set(session.resource, label);
-		console.log(`[AgentSessionsModel] setLabel: _renamedLabels now has ${this._renamedLabels.size} entries, key=${session.resource.toString()}, value="${label}"`);
 		this.cache.saveRenamedLabels(this._renamedLabels);
 		this._onDidChangeSessions.fire();
 	}

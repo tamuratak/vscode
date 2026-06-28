@@ -302,6 +302,8 @@ export class ChatService extends Disposable implements IChatService {
 		// that sessions are discoverable after a reload.
 		this._chatSessionStore.updateAndFlushIndexSync(liveLocalChats, liveNonLocalChats);
 
+		console.log(`[ChatService] saveState: saving ${liveLocalChats.length} local chats, titles=[${liveLocalChats.map(s => `${s.sessionId}="${s.customTitle ?? s.title}"`).join(', ')}]`);
+
 		// Kick off async file writes for session data.
 		this._chatSessionStore.storeSessions(liveLocalChats);
 		this._chatSessionStore.storeSessionsMetadataOnly(liveNonLocalChats);
@@ -337,16 +339,20 @@ export class ChatService extends Disposable implements IChatService {
 
 	async setChatSessionTitle(sessionResource: URI, title: string): Promise<void> {
 		const model = this._sessionModels.get(sessionResource);
+		console.log(`[ChatService] setChatSessionTitle: model=${!!model}, title="${title}" for ${sessionResource.toString()}`);
 		if (model) {
 			model.setCustomTitle(title);
+			console.log(`[ChatService] setChatSessionTitle: model.title after setCustomTitle="${model.title}", model.customTitle="${model.customTitle}"`);
 		}
 
 		// Update the title in the file storage
 		const localSessionId = LocalChatSessionUri.parseLocalSessionId(sessionResource);
+		console.log(`[ChatService] setChatSessionTitle: localSessionId="${localSessionId}"`);
 		if (localSessionId) {
 			await this._chatSessionStore.setSessionTitle(localSessionId, title);
 			// Trigger immediate save to ensure consistency
 			this.saveState();
+			console.log(`[ChatService] setChatSessionTitle: saveState done`);
 		}
 	}
 
@@ -551,6 +557,7 @@ export class ChatService extends Disposable implements IChatService {
 		this.trace('acquireOrRestoreSession', `${sessionResource}`);
 		const existingRef = this.acquireExistingSession(sessionResource, debugOwner);
 		if (existingRef) {
+			console.log(`[ChatService] acquireOrRestoreLocalSession: found existing model, title="${existingRef.object.title}" for ${sessionResource.toString()}`);
 			return existingRef;
 		}
 
@@ -566,6 +573,7 @@ export class ChatService extends Disposable implements IChatService {
 		}
 
 		if (!sessionData) {
+			console.log(`[ChatService] acquireOrRestoreLocalSession: no sessionData for ${sessionResource.toString()}`);
 			return undefined;
 		}
 

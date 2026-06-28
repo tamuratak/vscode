@@ -2452,6 +2452,7 @@ export class ChatModel extends Disposable implements IChatModel {
 		this._requests = initialData ? this._deserialize(initialData) : [];
 		this._timestamp = (isValidFullData && initialData.creationDate) || Date.now();
 		this._customTitle = isValidFullData ? initialData.customTitle : undefined;
+		console.log(`[ChatModel] constructor: _customTitle="${this._customTitle}", isValidFullData=${isValidFullData}, sessionId=${this._sessionId}, title="${this.title}"`);
 
 		// Initialize input model from serialized data (undefined for new chats)
 		const serializedInputState = initialModelProps.inputState || (isValidFullData && initialData.inputState ? initialData.inputState : undefined);

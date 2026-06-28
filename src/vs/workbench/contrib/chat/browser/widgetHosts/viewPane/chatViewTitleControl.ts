@@ -128,9 +128,11 @@ export class ChatViewTitleControl extends Disposable {
 
 	update(model: IChatModel | undefined): void {
 		this.model = model;
+		console.log(`[ChatViewTitleControl] update: model.title="${model?.title}", model.resource=${model?.sessionResource?.toString()}`);
 
 		this.modelDisposables.value = model?.onDidChange(e => {
 			if (e.kind === 'setCustomTitle' || e.kind === 'addRequest') {
+				console.log(`[ChatViewTitleControl] onDidChange: kind=${e.kind}, model.title="${this.model?.title}"`);
 				this.doUpdate();
 			}
 		});

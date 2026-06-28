@@ -7,7 +7,6 @@ import { Emitter, Event } from '../../../../../base/common/event.js';
 import { Codicon } from '../../../../../base/common/codicons.js';
 import { Disposable, DisposableMap, DisposableStore, MutableDisposable } from '../../../../../base/common/lifecycle.js';
 import { Schemas } from '../../../../../base/common/network.js';
-import { ResourceMap } from '../../../../../base/common/map.js';
 import { autorun, constObservable, IObservable, IReader, ISettableObservable, observableFromEvent, observableValue, transaction } from '../../../../../base/common/observable.js';
 import { ThemeIcon } from '../../../../../base/common/themables.js';
 import { URI, UriComponents } from '../../../../../base/common/uri.js';
@@ -441,11 +440,26 @@ export class LocalChatSessionsProvider extends Disposable implements ISessionsPr
 	) {
 		super();
 
+		console.log(`[LocalChatSessionsProvider] constructor: START`);
+
 		// Track requests on our sessions to update last message date,
 		// title, and persisted metadata when the chat widget sends
 		// subsequent messages directly (not via our sendRequest).
 		this._register(this.chatService.onDidSubmitRequest(e => {
 			const session = this._sessionCache.get(e.chatSessionResource.toString());
+			if (session) {
+				console.log(`[LocalChatSessionsProvider] onDidSubmitRequest: found session for ${e.chatSessionResource.toString()}`);
+				this._syncSessionFromModel(session);
+			}
+		}));
+
+		// When a chat model is created (e.g. the user opens a session),
+		// wire up title/status tracking so that renames made via
+		// chatService.setChatSessionTitle propagate to the sessions framework.
+		this._register(this.chatService.onDidCreateModel(model => {
+			console.log(`[LocalChatSessionsProvider] onDidCreateModel: model.title="${model.title}" for ${model.sessionResource.toString()}`);
+			const session = this._findSessionByResource(model.sessionResource);
+			console.log(`[LocalChatSessionsProvider] onDidCreateModel: session found=${!!session}`);
 			if (session) {
 				this._syncSessionFromModel(session);
 			}
@@ -514,12 +528,16 @@ export class LocalChatSessionsProvider extends Disposable implements ISessionsPr
 	private _syncSessionFromModel(session: LocalSession): void {
 		const model = this.chatService.getSession(session.resource);
 		if (!model) {
+			console.log(`[LocalChatSessionsProvider] _syncSessionFromModel: NO model for ${session.resource.toString()}`);
 			return;
 		}
+		console.log(`[LocalChatSessionsProvider] _syncSessionFromModel: model.title="${model.title}", session.title="${session.title.get()}" for ${session.resource.toString()}`);
 		session.trackModel(model, () => {
 			const timing = model.timing;
 			const lastUpdate = timing.lastRequestEnded ?? timing.lastRequestStarted ?? timing.created;
+			console.log(`[LocalChatSessionsProvider] trackModel onChange: model.title="${model.title}", session.title was "${session.title.get()}"`);
 			session.setTitle(model.title);
+			console.log(`[LocalChatSessionsProvider] trackModel onChange: session.title now "${session.title.get()}"`);
 			session.setUpdatedAt(new Date(lastUpdate));
 			this._updateStoredSession(session);
 			this._onDidChangeSessions.fire({ added: [], removed: [], changed: [this._toISession(session)] });
@@ -544,6 +562,7 @@ export class LocalChatSessionsProvider extends Disposable implements ISessionsPr
 			}
 			sessions.push(this._toISession(session));
 		}
+		console.log(`[LocalChatSessionsProvider] getSessions: ${sessions.length} sessions, titles=[${sessions.map(s => s.title.get()).join(', ')}]`);
 		return sessions;
 	}
 
@@ -562,11 +581,6 @@ export class LocalChatSessionsProvider extends Disposable implements ISessionsPr
 			return;
 		}
 
-		// Read user-renamed labels from the AgentSessionsModel cache so
-		// that the sessions framework's ISession.title reflects renames
-		// even when the provider's own storage is stale.
-		const renamedLabels = this._loadRenamedLabels();
-
 		const storedKeys = new Set(storedSessions.map(s => URI.revive(s.uri).toString()));
 		const loaded: LocalSession[] = [];
 
@@ -578,11 +592,10 @@ export class LocalChatSessionsProvider extends Disposable implements ISessionsPr
 			}
 
 			const workingDirectory = URI.revive(stored.workingDirectory);
-			// Apply renamed label if available
-			const effectiveTitle = renamedLabels.get(uri) ?? stored.title;
+			console.log(`[LocalChatSessionsProvider] _loadPersistedSessions: title="${stored.title}" for ${uri.toString()}`);
 			const detail: IChatDetail = {
 				sessionResource: uri,
-				title: effectiveTitle,
+				title: stored.title,
 				lastMessageDate: stored.lastMessageDate,
 				timing: { created: stored.createdAt, lastRequestStarted: undefined, lastRequestEnded: stored.lastMessageDate },
 				isActive: false,
@@ -619,25 +632,6 @@ export class LocalChatSessionsProvider extends Disposable implements ISessionsPr
 		if (added.length > 0) {
 			this._onDidChangeSessions.fire({ added, removed: [], changed: [] });
 		}
-	}
-
-	private static readonly RENAMED_LABELS_KEY = 'agentSessions.renamedLabels';
-
-	private _loadRenamedLabels(): ResourceMap<string> {
-		const labels = new ResourceMap<string>();
-		const raw = this.storageService.get(LocalChatSessionsProvider.RENAMED_LABELS_KEY, StorageScope.WORKSPACE);
-		if (!raw) {
-			return labels;
-		}
-		try {
-			const parsed = JSON.parse(raw) as Record<string, string>;
-			for (const [key, value] of Object.entries(parsed)) {
-				labels.set(URI.parse(key), value);
-			}
-		} catch {
-			// invalid data, ignore
-		}
-		return labels;
 	}
 
 	// -- Storage helpers --
@@ -897,8 +891,10 @@ export class LocalChatSessionsProvider extends Disposable implements ISessionsPr
 	}
 
 	async renameChat(_sessionId: string, chatUri: URI, title: string): Promise<void> {
+		console.log(`[LocalChatSessionsProvider] renameChat: title="${title}" for ${chatUri.toString()}`);
 		this.chatService.setSessionTitle(chatUri, title);
 		const session = this._findSessionByResource(chatUri);
+		console.log(`[LocalChatSessionsProvider] renameChat: session found=${!!session}`);
 		if (session) {
 			session.setTitle(title);
 			this._updateStoredSession(session);
@@ -1204,9 +1200,11 @@ export class LocalChatSessionsProvider extends Disposable implements ISessionsPr
 
 		const cached = this._sessionGroupCache.get(primary.sessionId);
 		if (cached) {
+			console.log(`[LocalChatSessionsProvider] _toISession: CACHED title="${cached.title.get()}" for ${primary.resource.toString()}`);
 			return cached;
 		}
 
+		console.log(`[LocalChatSessionsProvider] _toISession: NEW title="${primary.title.get()}" for ${primary.resource.toString()}`);
 		const groupISession = this._buildGroupISession(primary);
 		this._sessionGroupCache.set(primary.sessionId, groupISession);
 		return groupISession;
@@ -1220,6 +1218,8 @@ export class LocalChatSessionsProvider extends Disposable implements ISessionsPr
 	 */
 	private _buildGroupISession(primary: LocalSession): ISession {
 		const groupKey = primary.sessionId;
+
+		console.log(`[LocalChatSessionsProvider] _buildGroupISession: title="${primary.title.get()}" for ${primary.resource.toString()}`);
 
 		const chatsObs: IObservable<readonly IChat[]> = observableFromEvent(
 			this,

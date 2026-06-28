@@ -1417,11 +1417,9 @@ export class ChatSessionsService extends Disposable implements IChatSessionsServ
 	}
 
 	public async renameChatSession(sessionResource: URI, title: string, token: CancellationToken): Promise<void> {
-		console.log(`[ChatSessionsService] renameChatSession: resource=${sessionResource.toString()}, title="${title}"`);
 		// Resolve the session (creating it if necessary) so that rename works
 		// even when the session is not currently open in an editor.
 		const session = await this.getOrCreateChatSession(sessionResource, token);
-		console.log(`[ChatSessionsService] renameChatSession: got session, has renameSession=${!!session.renameSession}`);
 		if (!session.renameSession) {
 			throw new Error(`Session ${sessionResource.toString()} does not support renaming`);
 		}
