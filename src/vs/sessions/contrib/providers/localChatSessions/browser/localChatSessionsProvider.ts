@@ -561,6 +561,11 @@ export class LocalChatSessionsProvider extends Disposable implements ISessionsPr
 			return;
 		}
 
+		// Read user-renamed labels from the AgentSessionsModel cache so
+		// that the sessions framework's ISession.title reflects renames
+		// even when the provider's own storage is stale.
+		const renamedLabels = this._loadRenamedLabels();
+
 		const storedKeys = new Set(storedSessions.map(s => URI.revive(s.uri).toString()));
 		const loaded: LocalSession[] = [];
 
@@ -572,9 +577,11 @@ export class LocalChatSessionsProvider extends Disposable implements ISessionsPr
 			}
 
 			const workingDirectory = URI.revive(stored.workingDirectory);
+			// Apply renamed label if available
+			const effectiveTitle = renamedLabels.get(uri) ?? stored.title;
 			const detail: IChatDetail = {
 				sessionResource: uri,
-				title: stored.title,
+				title: effectiveTitle,
 				lastMessageDate: stored.lastMessageDate,
 				timing: { created: stored.createdAt, lastRequestStarted: undefined, lastRequestEnded: stored.lastMessageDate },
 				isActive: false,
@@ -611,6 +618,25 @@ export class LocalChatSessionsProvider extends Disposable implements ISessionsPr
 		if (added.length > 0) {
 			this._onDidChangeSessions.fire({ added, removed: [], changed: [] });
 		}
+	}
+
+	private static readonly RENAMED_LABELS_KEY = 'agentSessions.renamedLabels';
+
+	private _loadRenamedLabels(): ResourceMap<string> {
+		const labels = new ResourceMap<string>();
+		const raw = this.storageService.get(LocalChatSessionsProvider.RENAMED_LABELS_KEY, StorageScope.WORKSPACE);
+		if (!raw) {
+			return labels;
+		}
+		try {
+			const parsed = JSON.parse(raw) as Record<string, string>;
+			for (const [key, value] of Object.entries(parsed)) {
+				labels.set(URI.parse(key), value);
+			}
+		} catch {
+			// invalid data, ignore
+		}
+		return labels;
 	}
 
 	// -- Storage helpers --
