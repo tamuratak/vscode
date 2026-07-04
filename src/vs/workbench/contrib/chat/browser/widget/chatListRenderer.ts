@@ -1047,7 +1047,10 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 		// - This is the last non-pending response in the list
 		// - And it has some content
 		// - And the response is not complete
-		//   - Or, we previously started a progressive rendering of this element (if the element is complete, we will finish progressive rendering with a very fast rate)
+		//   - Or, we previously started a progressive rendering of this element
+		// When the response IS complete (or canceled), render all content at once
+		// via renderChatResponseBasic instead of catching up through the slow
+		// progressive render loop.
 		const incrementalRendering = this.configService.getValue<boolean>(ChatConfiguration.IncrementalRendering);
 		if (isResponseVM(element) && isStickyScrollTargetItem && (!element.isComplete || element.renderData)) {
 			this.traceLayout('renderElement', `start progressive render, index=${index}`);
@@ -1058,6 +1061,14 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 				// this method runs on every content update.
 				this.logIncrementalRenderingTelemetry();
 				this.doIncrementalRender(element, index, templateData);
+			} else if (element.isComplete || element.isCanceled) {
+				// Response is finished — render all content immediately
+				// instead of catching up through the timer-based progressive
+				// render loop, which can leave the final response partially
+				// rendered for several seconds (rate-limited to ~80 w/s).
+				element.renderData = undefined;
+				templateData.rowContainer.classList.toggle('chat-response-loading', false);
+				this.renderChatResponseBasic(element, index, templateData);
 			} else {
 				const timer = templateData.elementDisposables.add(new dom.WindowIntervalTimer());
 				const runProgressiveRender = (initial?: boolean) => {
