@@ -283,6 +283,28 @@ function upvoteAnimationSettingToEnum(value: string | undefined): ClickAnimation
 	}
 }
 
+/**
+ * Compares already-rendered parts against new content and returns a sparse
+ * array: `null` entries mean "no change", while non-null entries carry the
+ * new {@link IChatRendererContent} that needs to be (re-)rendered.
+ */
+export function diffChatContentParts(renderedParts: ReadonlyArray<IChatContentPart>, contentToRender: ReadonlyArray<IChatRendererContent>, element: ChatTreeItem): ReadonlyArray<IChatRendererContent | null> {
+	const diff: (IChatRendererContent | null)[] = [];
+	for (let i = 0; i < contentToRender.length; i++) {
+		const content = contentToRender[i];
+		const renderedPart = renderedParts[i];
+
+		if (!renderedPart || !renderedPart.hasSameContent(content, contentToRender.slice(i + 1), element)) {
+			diff.push(content);
+		} else {
+			// null -> no change
+			diff.push(null);
+		}
+	}
+
+	return diff;
+}
+
 export class ChatListItemRenderer extends Disposable implements ITreeRenderer<ChatTreeItem, FuzzyScore, IChatListItemTemplate> {
 	static readonly ID = 'item';
 
@@ -2134,20 +2156,7 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 	}
 
 	private diff(renderedParts: ReadonlyArray<IChatContentPart>, contentToRender: ReadonlyArray<IChatRendererContent>, element: ChatTreeItem): ReadonlyArray<IChatRendererContent | null> {
-		const diff: (IChatRendererContent | null)[] = [];
-		for (let i = 0; i < contentToRender.length; i++) {
-			const content = contentToRender[i];
-			const renderedPart = renderedParts[i];
-
-			if (!renderedPart || !renderedPart.hasSameContent(content, contentToRender.slice(i + 1), element)) {
-				diff.push(content);
-			} else {
-				// null -> no change
-				diff.push(null);
-			}
-		}
-
-		return diff;
+		return diffChatContentParts(renderedParts, contentToRender, element);
 	}
 
 	private hasEditCodeblockUri(part: IChatRendererContent): boolean {

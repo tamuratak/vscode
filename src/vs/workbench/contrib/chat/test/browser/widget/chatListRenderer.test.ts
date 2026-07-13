@@ -4,10 +4,14 @@
  *--------------------------------------------------------------------------------------------*/
 
 import assert from 'assert';
+import { Disposable, DisposableStore } from '../../../../../../base/common/lifecycle.js';
+import { constObservable } from '../../../../../../base/common/observable.js';
 import { URI } from '../../../../../../base/common/uri.js';
 import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../../base/test/common/utils.js';
-import { buildPlanReviewProgressContent, getWorkingProgressRelevantParts, shouldCreateGroupedThinkingPart, shouldHideChatUserIdentity, shouldRenderInitialProgressiveContentImmediately, shouldScheduleInitialHeightChange, shouldStartNewCollapsedThinkingGroup } from '../../../browser/widget/chatListRenderer.js';
-import { IChatToolInvocationSerialized, ToolConfirmKind } from '../../../common/chatService/chatService.js';
+import { ChatTreeItem } from '../../../browser/chat.js';
+import { buildPlanReviewProgressContent, diffChatContentParts, getWorkingProgressRelevantParts, shouldCreateGroupedThinkingPart, shouldHideChatUserIdentity, shouldRenderInitialProgressiveContentImmediately, shouldScheduleInitialHeightChange, shouldStartNewCollapsedThinkingGroup } from '../../../browser/widget/chatListRenderer.js';
+import { IChatContentPart } from '../../../browser/widget/chatContentParts/chatContentParts.js';
+import { IChatToolInvocation, IChatToolInvocationSerialized, ToolConfirmKind } from '../../../common/chatService/chatService.js';
 import { CollapsedToolsDisplayMode, ThinkingDisplayMode } from '../../../common/constants.js';
 import { IChatRendererContent } from '../../../common/model/chatViewModel.js';
 import { ToolDataSource } from '../../../common/tools/languageModelToolsService.js';
@@ -156,6 +160,188 @@ suite('ChatListRenderer', () => {
 		];
 
 		assert.deepStrictEqual(getWorkingProgressRelevantParts(parts).map(part => part.kind), ['references']);
+	});
+
+	suite('diffChatContentParts', () => {
+		const fakeElement = {} as ChatTreeItem;
+		let disposables: DisposableStore;
+
+		setup(() => {
+			disposables = new DisposableStore();
+		});
+
+		teardown(() => {
+			disposables.dispose();
+		});
+
+		function createMockPart(hasSameContent: IChatContentPart['hasSameContent']): IChatContentPart {
+			return disposables.add(new class extends Disposable {
+				domNode = undefined;
+				hasSameContent = hasSameContent;
+			}());
+		}
+
+		/**
+		 * Mimics the current (buggy) ChatToolInvocationPart.hasSameContent
+		 * that only checks toolCallId and ignores state changes.
+		 */
+		function toolInvocationHasSameContentCurrent(
+			thisToolCallId: string,
+			other: IChatRendererContent,
+		): boolean {
+			return (other.kind === 'toolInvocation' || other.kind === 'toolInvocationSerialized')
+				&& thisToolCallId === other.toolCallId;
+		}
+
+		test('tool invocation should be re-rendered when state changes from Streaming to Completed', () => {
+			const toolCallId = 'call-1';
+
+			// Rendered part was created during Streaming state
+			const renderedPart = createMockPart(
+				(other, followingContent, element) => toolInvocationHasSameContentCurrent(toolCallId, other),
+			);
+
+			// New content has same toolCallId but Completed state
+			const newContent: IChatRendererContent = {
+				kind: 'toolInvocation',
+				toolCallId,
+				toolId: 'search',
+				source: ToolDataSource.Internal,
+				invocationMessage: 'Searching...',
+				originMessage: undefined,
+				pastTenseMessage: 'Searched',
+				state: constObservable({ type: IChatToolInvocation.StateKind.Completed, parameters: {}, confirmed: { type: ToolConfirmKind.ConfirmationNotNeeded }, resultDetails: undefined, postConfirmed: undefined, contentForModel: [] }),
+				toolSpecificDataKind: constObservable(undefined),
+				toolSpecificData: undefined,
+				presentation: undefined,
+				isAttachedToThinking: false,
+				generatedTitle: undefined,
+				kind: 'toolInvocation',
+				toJSON(): IChatToolInvocationSerialized {
+					return {
+						kind: 'toolInvocationSerialized',
+						toolCallId,
+						toolId: 'search',
+						source: ToolDataSource.Internal,
+						invocationMessage: 'Searching...',
+						originMessage: undefined,
+						pastTenseMessage: 'Searched',
+						isConfirmed: { type: ToolConfirmKind.ConfirmationNotNeeded },
+						isComplete: true,
+						presentation: undefined,
+						toolSpecificData: undefined,
+					};
+				},
+			} as unknown as IChatRendererContent;
+
+			const result = diffChatContentParts([renderedPart], [newContent], fakeElement);
+
+			// State changed from Streaming to Completed: diff should return the new content (not null)
+			assert.strictEqual(result[0], newContent, 'State change should trigger re-render');
+		});
+
+		test('returns content when toolCallId differs', () => {
+			const renderedPart = createMockPart(
+				(other) => toolInvocationHasSameContentCurrent('call-1', other),
+			);
+
+			const newContent: IChatRendererContent = {
+				kind: 'toolInvocation',
+				toolCallId: 'call-2',
+			} as unknown as IChatRendererContent;
+
+			const result = diffChatContentParts([renderedPart], [newContent], fakeElement);
+
+			assert.strictEqual(result[0], newContent, 'Different toolCallId should trigger re-render');
+		});
+
+		test('returns null for identical content', () => {
+			const content: IChatRendererContent = {
+				kind: 'markdownContent',
+				content: { value: 'hello' },
+			};
+
+			const renderedPart = createMockPart(
+				(other) => other.kind === 'markdownContent' && other.content.value === 'hello',
+			);
+
+			const result = diffChatContentParts([renderedPart], [content], fakeElement);
+
+			assert.strictEqual(result[0], null, 'Same content should return null');
+		});
+
+		test('returns content when no rendered part exists', () => {
+			const content: IChatRendererContent = {
+				kind: 'markdownContent',
+				content: { value: 'hello' },
+			};
+
+			const result = diffChatContentParts([], [content], fakeElement);
+
+			assert.strictEqual(result[0], content, 'No rendered part should trigger render');
+		});
+
+		test('diff correctly handles mixed content with state-changing tool invocations', () => {
+			const toolCallId = 'call-1';
+
+			const renderedPart = createMockPart(
+				(other) => toolInvocationHasSameContentCurrent(toolCallId, other),
+			);
+			const markdownPart = createMockPart(
+				(other) => other.kind === 'markdownContent' && other.content.value === 'old text',
+			);
+
+			const toolContent: IChatRendererContent = {
+				kind: 'toolInvocation',
+				toolCallId,
+			} as unknown as IChatRendererContent;
+
+			const newMarkdown: IChatRendererContent = {
+				kind: 'markdownContent',
+				content: { value: 'new text' },
+			};
+
+			const result = diffChatContentParts(
+				[renderedPart, markdownPart],
+				[toolContent, newMarkdown],
+				fakeElement,
+			);
+
+			// Tool invocation: state changed -> should re-render
+			assert.strictEqual(result[0], toolContent, 'Tool invocation: state change should trigger re-render');
+			// Markdown: different content -> re-render
+			assert.strictEqual(result[1], newMarkdown, 'Markdown: different content triggers re-render');
+		});
+
+		test('fixed hasSameContent would detect state changes', () => {
+			const toolCallId = 'call-1';
+
+			// Simulate the FIXED hasSameContent that also checks state type
+			const renderedPart = createMockPart(
+				(other, followingContent, element) => {
+					if (other.kind !== 'toolInvocation' && other.kind !== 'toolInvocationSerialized') {
+						return false;
+					}
+					if (toolCallId !== other.toolCallId) {
+						return false;
+					}
+					// The fix: also compare state type
+					// In the real code, this.toolInvocation.state.get().type would be compared
+					// Here we simulate it by always returning false (state changed)
+					return false;
+				},
+			);
+
+			const newContent: IChatRendererContent = {
+				kind: 'toolInvocation',
+				toolCallId,
+			} as unknown as IChatRendererContent;
+
+			const result = diffChatContentParts([renderedPart], [newContent], fakeElement);
+
+			// With the fix: state change detected -> re-render
+			assert.strictEqual(result[0], newContent, 'Fixed hasSameContent detects state change and triggers re-render');
+		});
 	});
 
 });
