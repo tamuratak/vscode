@@ -531,6 +531,655 @@ suite('ChatListRenderer', () => {
 		disposables.dispose();
 	});
 
+	test('final markdown mounts after thinking and tools with default motion', async () => {
+		const disposables = store.add(new DisposableStore());
+		const instantiationService = workbenchInstantiationService(undefined, disposables);
+		const configurationService = new TestConfigurationService();
+		configurationService.setUserConfiguration(ChatConfiguration.IncrementalRendering, false);
+		configurationService.setUserConfiguration(ChatConfiguration.ThinkingStyle, ThinkingDisplayMode.FixedScrolling);
+		configurationService.setUserConfiguration('chat.agent.thinking.collapsedTools', CollapsedToolsDisplayMode.Always);
+		configurationService.setUserConfiguration('chat.checkpoints.enabled', false);
+		configurationService.setUserConfiguration('chat.checkpoints.showFileChanges', false);
+		configurationService.setUserConfiguration(ChatConfiguration.TurnStatusPills, false);
+		configurationService.setUserConfiguration(ChatConfiguration.Verbose, false);
+		configurationService.setUserConfiguration('workbench.reduceMotion', 'off');
+		instantiationService.stub(IConfigurationService, configurationService);
+		instantiationService.stub(IChatService, new MockChatService());
+		instantiationService.stub(IChatAgentService, disposables.add(instantiationService.createInstance(ChatAgentService)));
+
+		const model = disposables.add(instantiationService.createInstance(ChatModel, undefined, { initialLocation: ChatAgentLocation.Chat, canUseTools: true }));
+		const viewModel = disposables.add(instantiationService.createInstance(ChatViewModel, model, undefined));
+		const text = 'test';
+		const request = model.addRequest({
+			text,
+			parts: [new ChatRequestTextPart(new OffsetRange(0, text.length), new Range(1, 1, 1, text.length + 1), text)]
+		}, { variables: [] }, 0);
+		const response = viewModel.getItems().find(isResponseVM);
+		assert.ok(response);
+
+		const container = mainWindow.document.createElement('div');
+		mainWindow.document.body.appendChild(container);
+		disposables.add(toDisposable(() => container.remove()));
+		const renderer = disposables.add(instantiationService.createInstance(
+			ChatListItemRenderer,
+			{} as ChatEditorOptions,
+			{ progressMessageAtBottomOfResponse: true },
+			{
+				getListLength: () => 1,
+				onDidScroll: () => toDisposable(() => { }),
+				container,
+				currentChatMode: () => ChatModeKind.Agent,
+			},
+			undefined,
+			viewModel,
+		));
+		const template = renderer.renderTemplate(container);
+		disposables.add(toDisposable(() => renderer.disposeTemplate(template)));
+		const node = { element: response, children: [], depth: 0, visibleChildrenCount: 0, visibleChildIndex: 0, collapsible: false, collapsed: false, visible: true, filterData: undefined };
+
+		model.acceptResponseProgress(request, { kind: 'thinking', value: 'Thinking ...', id: 'thinking-1' });
+		renderer.renderElement(node, 0, template);
+
+		const toolInvocation = new ChatToolInvocation({
+			invocationMessage: 'Running tool...',
+			pastTenseMessage: 'Tool completed',
+		}, {
+			id: 'my-tool',
+			displayName: 'My Tool',
+			modelDescription: 'Test tool',
+			source: ToolDataSource.Internal,
+		}, 'call-1', undefined, {}, {}, request.id);
+		model.acceptResponseProgress(request, toolInvocation);
+		renderer.renderElement(node, 0, template);
+
+		await toolInvocation.didExecuteTool(undefined);
+		renderer.renderElement(node, 0, template);
+
+		model.acceptResponseProgress(request, { kind: 'markdownContent', content: new MarkdownString('Final response') });
+		renderer.renderElement(node, 0, template);
+		const mountedWhileStreaming = template.value.textContent?.includes('Final response') ?? false;
+
+		request.response?.complete();
+		renderer.renderElement(node, 0, template);
+		assert.deepStrictEqual({
+			mountedWhileStreaming,
+			mountedAfterCompletion: template.value.textContent?.includes('Final response') ?? false,
+		}, {
+			mountedWhileStreaming: true,
+			mountedAfterCompletion: true,
+		});
+
+		disposables.dispose();
+	});
+
+	test('final markdown mounts with incremental rendering enabled', async () => {
+		const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+		const disposables = store.add(new DisposableStore());
+		const instantiationService = workbenchInstantiationService(undefined, disposables);
+		const configurationService = new TestConfigurationService();
+		configurationService.setUserConfiguration(ChatConfiguration.IncrementalRendering, true);
+		configurationService.setUserConfiguration(ChatConfiguration.ThinkingStyle, ThinkingDisplayMode.FixedScrolling);
+		configurationService.setUserConfiguration('chat.agent.thinking.collapsedTools', CollapsedToolsDisplayMode.Always);
+		configurationService.setUserConfiguration('chat.checkpoints.enabled', false);
+		configurationService.setUserConfiguration('chat.checkpoints.showFileChanges', false);
+		configurationService.setUserConfiguration(ChatConfiguration.TurnStatusPills, false);
+		configurationService.setUserConfiguration(ChatConfiguration.Verbose, false);
+		configurationService.setUserConfiguration('workbench.reduceMotion', 'on');
+		instantiationService.stub(IConfigurationService, configurationService);
+		instantiationService.stub(IChatService, new MockChatService());
+		instantiationService.stub(IChatAgentService, disposables.add(instantiationService.createInstance(ChatAgentService)));
+
+		const model = disposables.add(instantiationService.createInstance(ChatModel, undefined, { initialLocation: ChatAgentLocation.Chat, canUseTools: true }));
+		const viewModel = disposables.add(instantiationService.createInstance(ChatViewModel, model, undefined));
+		const text = 'test';
+		const request = model.addRequest({
+			text,
+			parts: [new ChatRequestTextPart(new OffsetRange(0, text.length), new Range(1, 1, 1, text.length + 1), text)]
+		}, { variables: [] }, 0);
+		const response = viewModel.getItems().find(isResponseVM);
+		assert.ok(response);
+
+		const container = mainWindow.document.createElement('div');
+		mainWindow.document.body.appendChild(container);
+		disposables.add(toDisposable(() => container.remove()));
+		const renderer = disposables.add(instantiationService.createInstance(
+			ChatListItemRenderer,
+			{} as ChatEditorOptions,
+			{ progressMessageAtBottomOfResponse: true },
+			{
+				getListLength: () => 1,
+				onDidScroll: () => toDisposable(() => { }),
+				container,
+				currentChatMode: () => ChatModeKind.Agent,
+			},
+			undefined,
+			viewModel,
+		));
+		const template = renderer.renderTemplate(container);
+		disposables.add(toDisposable(() => renderer.disposeTemplate(template)));
+		const node = { element: response, children: [], depth: 0, visibleChildrenCount: 0, visibleChildIndex: 0, collapsible: false, collapsed: false, visible: true, filterData: undefined };
+
+		model.acceptResponseProgress(request, { kind: 'thinking', value: 'Reasoning step...', id: 'thinking-1' });
+		renderer.renderElement(node, 0, template);
+
+		model.acceptResponseProgress(request, { kind: 'markdownContent', content: new MarkdownString('Partial response') });
+		renderer.renderElement(node, 0, template);
+		const partialMounted = template.value.textContent?.includes('Partial response') ?? false;
+
+		model.acceptResponseProgress(request, { kind: 'markdownContent', content: new MarkdownString('Final response') });
+		renderer.renderElement(node, 0, template);
+
+		// Incremental rendering uses a morpher to transition between content chunks;
+		// allow time for the morpher to drain before checking the DOM.
+		await sleep(100);
+		const finalMounted = template.value.textContent?.includes('Final response') ?? false;
+
+		request.response?.complete();
+		renderer.renderElement(node, 0, template);
+		await sleep(100);
+		assert.deepStrictEqual({
+			partialMounted,
+			finalMounted,
+			mountedAfterCompletion: template.value.textContent?.includes('Final response') ?? false,
+		}, {
+			partialMounted: true,
+			finalMounted: true,
+			mountedAfterCompletion: true,
+		});
+
+		disposables.dispose();
+	});
+
+	test('final markdown mounts with collapsed preview thinking mode', async () => {
+		const disposables = store.add(new DisposableStore());
+		const instantiationService = workbenchInstantiationService(undefined, disposables);
+		const configurationService = new TestConfigurationService();
+		configurationService.setUserConfiguration(ChatConfiguration.IncrementalRendering, false);
+		configurationService.setUserConfiguration(ChatConfiguration.ThinkingStyle, ThinkingDisplayMode.CollapsedPreview);
+		configurationService.setUserConfiguration('chat.agent.thinking.collapsedTools', CollapsedToolsDisplayMode.WithThinking);
+		configurationService.setUserConfiguration('chat.checkpoints.enabled', false);
+		configurationService.setUserConfiguration('chat.checkpoints.showFileChanges', false);
+		configurationService.setUserConfiguration(ChatConfiguration.TurnStatusPills, false);
+		configurationService.setUserConfiguration(ChatConfiguration.Verbose, false);
+		configurationService.setUserConfiguration('workbench.reduceMotion', 'on');
+		instantiationService.stub(IConfigurationService, configurationService);
+		instantiationService.stub(IChatService, new MockChatService());
+		instantiationService.stub(IChatAgentService, disposables.add(instantiationService.createInstance(ChatAgentService)));
+
+		const model = disposables.add(instantiationService.createInstance(ChatModel, undefined, { initialLocation: ChatAgentLocation.Chat, canUseTools: true }));
+		const viewModel = disposables.add(instantiationService.createInstance(ChatViewModel, model, undefined));
+		const text = 'test';
+		const request = model.addRequest({
+			text,
+			parts: [new ChatRequestTextPart(new OffsetRange(0, text.length), new Range(1, 1, 1, text.length + 1), text)]
+		}, { variables: [] }, 0);
+		const response = viewModel.getItems().find(isResponseVM);
+		assert.ok(response);
+
+		const container = mainWindow.document.createElement('div');
+		mainWindow.document.body.appendChild(container);
+		disposables.add(toDisposable(() => container.remove()));
+		const renderer = disposables.add(instantiationService.createInstance(
+			ChatListItemRenderer,
+			{} as ChatEditorOptions,
+			{ progressMessageAtBottomOfResponse: true },
+			{
+				getListLength: () => 1,
+				onDidScroll: () => toDisposable(() => { }),
+				container,
+				currentChatMode: () => ChatModeKind.Agent,
+			},
+			undefined,
+			viewModel,
+		));
+		const template = renderer.renderTemplate(container);
+		disposables.add(toDisposable(() => renderer.disposeTemplate(template)));
+		const node = { element: response, children: [], depth: 0, visibleChildrenCount: 0, visibleChildIndex: 0, collapsible: false, collapsed: false, visible: true, filterData: undefined };
+
+		model.acceptResponseProgress(request, { kind: 'thinking', value: 'Step 1 thinking...', id: 'thinking-1' });
+		renderer.renderElement(node, 0, template);
+
+		const toolInvocation = new ChatToolInvocation({
+			invocationMessage: 'Running tool...',
+			pastTenseMessage: 'Tool completed',
+		}, {
+			id: 'my-tool',
+			displayName: 'My Tool',
+			modelDescription: 'Test tool',
+			source: ToolDataSource.Internal,
+		}, 'call-1', undefined, {}, {}, request.id);
+		model.acceptResponseProgress(request, toolInvocation);
+		renderer.renderElement(node, 0, template);
+
+		await toolInvocation.didExecuteTool(undefined);
+		renderer.renderElement(node, 0, template);
+
+		model.acceptResponseProgress(request, { kind: 'markdownContent', content: new MarkdownString('Final response') });
+		renderer.renderElement(node, 0, template);
+		const mountedWhileStreaming = template.value.textContent?.includes('Final response') ?? false;
+
+		request.response?.complete();
+		renderer.renderElement(node, 0, template);
+		assert.deepStrictEqual({
+			mountedWhileStreaming,
+			mountedAfterCompletion: template.value.textContent?.includes('Final response') ?? false,
+		}, {
+			mountedWhileStreaming: true,
+			mountedAfterCompletion: true,
+		});
+
+		disposables.dispose();
+	});
+
+	test('final markdown mounts with collapsed thinking mode', async () => {
+		const disposables = store.add(new DisposableStore());
+		const instantiationService = workbenchInstantiationService(undefined, disposables);
+		const configurationService = new TestConfigurationService();
+		configurationService.setUserConfiguration(ChatConfiguration.IncrementalRendering, false);
+		configurationService.setUserConfiguration(ChatConfiguration.ThinkingStyle, ThinkingDisplayMode.Collapsed);
+		configurationService.setUserConfiguration('chat.agent.thinking.collapsedTools', CollapsedToolsDisplayMode.WithThinking);
+		configurationService.setUserConfiguration('chat.checkpoints.enabled', false);
+		configurationService.setUserConfiguration('chat.checkpoints.showFileChanges', false);
+		configurationService.setUserConfiguration(ChatConfiguration.TurnStatusPills, false);
+		configurationService.setUserConfiguration(ChatConfiguration.Verbose, false);
+		configurationService.setUserConfiguration('workbench.reduceMotion', 'on');
+		instantiationService.stub(IConfigurationService, configurationService);
+		instantiationService.stub(IChatService, new MockChatService());
+		instantiationService.stub(IChatAgentService, disposables.add(instantiationService.createInstance(ChatAgentService)));
+
+		const model = disposables.add(instantiationService.createInstance(ChatModel, undefined, { initialLocation: ChatAgentLocation.Chat, canUseTools: true }));
+		const viewModel = disposables.add(instantiationService.createInstance(ChatViewModel, model, undefined));
+		const text = 'test';
+		const request = model.addRequest({
+			text,
+			parts: [new ChatRequestTextPart(new OffsetRange(0, text.length), new Range(1, 1, 1, text.length + 1), text)]
+		}, { variables: [] }, 0);
+		const response = viewModel.getItems().find(isResponseVM);
+		assert.ok(response);
+
+		const container = mainWindow.document.createElement('div');
+		mainWindow.document.body.appendChild(container);
+		disposables.add(toDisposable(() => container.remove()));
+		const renderer = disposables.add(instantiationService.createInstance(
+			ChatListItemRenderer,
+			{} as ChatEditorOptions,
+			{ progressMessageAtBottomOfResponse: true },
+			{
+				getListLength: () => 1,
+				onDidScroll: () => toDisposable(() => { }),
+				container,
+				currentChatMode: () => ChatModeKind.Agent,
+			},
+			undefined,
+			viewModel,
+		));
+		const template = renderer.renderTemplate(container);
+		disposables.add(toDisposable(() => renderer.disposeTemplate(template)));
+		const node = { element: response, children: [], depth: 0, visibleChildrenCount: 0, visibleChildIndex: 0, collapsible: false, collapsed: false, visible: true, filterData: undefined };
+
+		model.acceptResponseProgress(request, { kind: 'thinking', value: 'Step 1 thinking...', id: 'thinking-1' });
+		renderer.renderElement(node, 0, template);
+
+		const toolInvocation = new ChatToolInvocation({
+			invocationMessage: 'Running tool...',
+			pastTenseMessage: 'Tool completed',
+		}, {
+			id: 'my-tool',
+			displayName: 'My Tool',
+			modelDescription: 'Test tool',
+			source: ToolDataSource.Internal,
+		}, 'call-1', undefined, {}, {}, request.id);
+		model.acceptResponseProgress(request, toolInvocation);
+		renderer.renderElement(node, 0, template);
+
+		await toolInvocation.didExecuteTool(undefined);
+		renderer.renderElement(node, 0, template);
+
+		model.acceptResponseProgress(request, { kind: 'markdownContent', content: new MarkdownString('Final response') });
+		renderer.renderElement(node, 0, template);
+		const mountedWhileStreaming = template.value.textContent?.includes('Final response') ?? false;
+
+		request.response?.complete();
+		renderer.renderElement(node, 0, template);
+		assert.deepStrictEqual({
+			mountedWhileStreaming,
+			mountedAfterCompletion: template.value.textContent?.includes('Final response') ?? false,
+		}, {
+			mountedWhileStreaming: true,
+			mountedAfterCompletion: true,
+		});
+
+		disposables.dispose();
+	});
+
+	test('final markdown mounts after async delays between progress updates', async () => {
+		const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+		const disposables = store.add(new DisposableStore());
+		const instantiationService = workbenchInstantiationService(undefined, disposables);
+		const configurationService = new TestConfigurationService();
+		configurationService.setUserConfiguration(ChatConfiguration.IncrementalRendering, false);
+		configurationService.setUserConfiguration(ChatConfiguration.ThinkingStyle, ThinkingDisplayMode.FixedScrolling);
+		configurationService.setUserConfiguration('chat.agent.thinking.collapsedTools', CollapsedToolsDisplayMode.Always);
+		configurationService.setUserConfiguration('chat.checkpoints.enabled', false);
+		configurationService.setUserConfiguration('chat.checkpoints.showFileChanges', false);
+		configurationService.setUserConfiguration(ChatConfiguration.TurnStatusPills, false);
+		configurationService.setUserConfiguration(ChatConfiguration.Verbose, false);
+		configurationService.setUserConfiguration('workbench.reduceMotion', 'on');
+		instantiationService.stub(IConfigurationService, configurationService);
+		instantiationService.stub(IChatService, new MockChatService());
+		instantiationService.stub(IChatAgentService, disposables.add(instantiationService.createInstance(ChatAgentService)));
+
+		const model = disposables.add(instantiationService.createInstance(ChatModel, undefined, { initialLocation: ChatAgentLocation.Chat, canUseTools: true }));
+		const viewModel = disposables.add(instantiationService.createInstance(ChatViewModel, model, undefined));
+		const text = 'test';
+		const request = model.addRequest({
+			text,
+			parts: [new ChatRequestTextPart(new OffsetRange(0, text.length), new Range(1, 1, 1, text.length + 1), text)]
+		}, { variables: [] }, 0);
+		const response = viewModel.getItems().find(isResponseVM);
+		assert.ok(response);
+
+		const container = mainWindow.document.createElement('div');
+		mainWindow.document.body.appendChild(container);
+		disposables.add(toDisposable(() => container.remove()));
+		const renderer = disposables.add(instantiationService.createInstance(
+			ChatListItemRenderer,
+			{} as ChatEditorOptions,
+			{ progressMessageAtBottomOfResponse: true },
+			{
+				getListLength: () => 1,
+				onDidScroll: () => toDisposable(() => { }),
+				container,
+				currentChatMode: () => ChatModeKind.Agent,
+			},
+			undefined,
+			viewModel,
+		));
+		const template = renderer.renderTemplate(container);
+		disposables.add(toDisposable(() => renderer.disposeTemplate(template)));
+		const node = { element: response, children: [], depth: 0, visibleChildrenCount: 0, visibleChildIndex: 0, collapsible: false, collapsed: false, visible: true, filterData: undefined };
+
+		model.acceptResponseProgress(request, { kind: 'thinking', value: 'Thinking ...', id: 'thinking-1' });
+		renderer.renderElement(node, 0, template);
+
+		await sleep(50);
+
+		const toolInvocation = new ChatToolInvocation({
+			invocationMessage: 'Running tool...',
+			pastTenseMessage: 'Tool completed',
+		}, {
+			id: 'my-tool',
+			displayName: 'My Tool',
+			modelDescription: 'Test tool',
+			source: ToolDataSource.Internal,
+		}, 'call-1', undefined, {}, {}, request.id);
+		model.acceptResponseProgress(request, toolInvocation);
+		renderer.renderElement(node, 0, template);
+
+		await sleep(50);
+		await toolInvocation.didExecuteTool(undefined);
+		renderer.renderElement(node, 0, template);
+
+		await sleep(50);
+
+		model.acceptResponseProgress(request, { kind: 'markdownContent', content: new MarkdownString('Final response') });
+		renderer.renderElement(node, 0, template);
+
+		await sleep(50);
+
+		request.response?.complete();
+		renderer.renderElement(node, 0, template);
+
+		assert.strictEqual(template.value.textContent?.includes('Final response'), true);
+
+		disposables.dispose();
+	});
+
+	test('final markdown mounts after multiple sequential tool invocations', async () => {
+		const disposables = store.add(new DisposableStore());
+		const instantiationService = workbenchInstantiationService(undefined, disposables);
+		const configurationService = new TestConfigurationService();
+		configurationService.setUserConfiguration(ChatConfiguration.IncrementalRendering, false);
+		configurationService.setUserConfiguration(ChatConfiguration.ThinkingStyle, ThinkingDisplayMode.FixedScrolling);
+		configurationService.setUserConfiguration('chat.agent.thinking.collapsedTools', CollapsedToolsDisplayMode.Always);
+		configurationService.setUserConfiguration('chat.checkpoints.enabled', false);
+		configurationService.setUserConfiguration('chat.checkpoints.showFileChanges', false);
+		configurationService.setUserConfiguration(ChatConfiguration.TurnStatusPills, false);
+		configurationService.setUserConfiguration(ChatConfiguration.Verbose, false);
+		configurationService.setUserConfiguration('workbench.reduceMotion', 'on');
+		instantiationService.stub(IConfigurationService, configurationService);
+		instantiationService.stub(IChatService, new MockChatService());
+		instantiationService.stub(IChatAgentService, disposables.add(instantiationService.createInstance(ChatAgentService)));
+
+		const model = disposables.add(instantiationService.createInstance(ChatModel, undefined, { initialLocation: ChatAgentLocation.Chat, canUseTools: true }));
+		const viewModel = disposables.add(instantiationService.createInstance(ChatViewModel, model, undefined));
+		const text = 'test';
+		const request = model.addRequest({
+			text,
+			parts: [new ChatRequestTextPart(new OffsetRange(0, text.length), new Range(1, 1, 1, text.length + 1), text)]
+		}, { variables: [] }, 0);
+		const response = viewModel.getItems().find(isResponseVM);
+		assert.ok(response);
+
+		const container = mainWindow.document.createElement('div');
+		mainWindow.document.body.appendChild(container);
+		disposables.add(toDisposable(() => container.remove()));
+		const renderer = disposables.add(instantiationService.createInstance(
+			ChatListItemRenderer,
+			{} as ChatEditorOptions,
+			{ progressMessageAtBottomOfResponse: true },
+			{
+				getListLength: () => 1,
+				onDidScroll: () => toDisposable(() => { }),
+				container,
+				currentChatMode: () => ChatModeKind.Agent,
+			},
+			undefined,
+			viewModel,
+		));
+		const template = renderer.renderTemplate(container);
+		disposables.add(toDisposable(() => renderer.disposeTemplate(template)));
+		const node = { element: response, children: [], depth: 0, visibleChildrenCount: 0, visibleChildIndex: 0, collapsible: false, collapsed: false, visible: true, filterData: undefined };
+
+		model.acceptResponseProgress(request, { kind: 'thinking', value: 'Thinking ...', id: 'thinking-1' });
+		renderer.renderElement(node, 0, template);
+
+		const firstTool = new ChatToolInvocation({
+			invocationMessage: 'Searching files...',
+			pastTenseMessage: 'Searched files',
+		}, {
+			id: 'search-tool',
+			displayName: 'Search',
+			modelDescription: 'Search tool',
+			source: ToolDataSource.Internal,
+		}, 'call-1', undefined, {}, {}, request.id);
+		model.acceptResponseProgress(request, firstTool);
+		renderer.renderElement(node, 0, template);
+
+		await firstTool.didExecuteTool(undefined);
+		renderer.renderElement(node, 0, template);
+
+		model.acceptResponseProgress(request, { kind: 'thinking', value: 'More thinking ...', id: 'thinking-2' });
+		renderer.renderElement(node, 0, template);
+
+		const secondTool = new ChatToolInvocation({
+			invocationMessage: 'Reading file...',
+			pastTenseMessage: 'Read file',
+		}, {
+			id: 'read-tool',
+			displayName: 'Read',
+			modelDescription: 'Read tool',
+			source: ToolDataSource.Internal,
+		}, 'call-2', undefined, {}, {}, request.id);
+		model.acceptResponseProgress(request, secondTool);
+		renderer.renderElement(node, 0, template);
+
+		await secondTool.didExecuteTool(undefined);
+		renderer.renderElement(node, 0, template);
+
+		model.acceptResponseProgress(request, { kind: 'markdownContent', content: new MarkdownString('Final response after tools') });
+		renderer.renderElement(node, 0, template);
+		const mountedWhileStreaming = template.value.textContent?.includes('Final response after tools') ?? false;
+
+		request.response?.complete();
+		renderer.renderElement(node, 0, template);
+		assert.deepStrictEqual({
+			mountedWhileStreaming,
+			mountedAfterCompletion: template.value.textContent?.includes('Final response after tools') ?? false,
+		}, {
+			mountedWhileStreaming: true,
+			mountedAfterCompletion: true,
+		});
+
+		disposables.dispose();
+	});
+
+	test('final markdown mounts after tool execution with error', async () => {
+		const disposables = store.add(new DisposableStore());
+		const instantiationService = workbenchInstantiationService(undefined, disposables);
+		const configurationService = new TestConfigurationService();
+		configurationService.setUserConfiguration(ChatConfiguration.IncrementalRendering, false);
+		configurationService.setUserConfiguration(ChatConfiguration.ThinkingStyle, ThinkingDisplayMode.FixedScrolling);
+		configurationService.setUserConfiguration('chat.agent.thinking.collapsedTools', CollapsedToolsDisplayMode.Always);
+		configurationService.setUserConfiguration('chat.checkpoints.enabled', false);
+		configurationService.setUserConfiguration('chat.checkpoints.showFileChanges', false);
+		configurationService.setUserConfiguration(ChatConfiguration.TurnStatusPills, false);
+		configurationService.setUserConfiguration(ChatConfiguration.Verbose, false);
+		configurationService.setUserConfiguration('workbench.reduceMotion', 'on');
+		instantiationService.stub(IConfigurationService, configurationService);
+		instantiationService.stub(IChatService, new MockChatService());
+		instantiationService.stub(IChatAgentService, disposables.add(instantiationService.createInstance(ChatAgentService)));
+
+		const model = disposables.add(instantiationService.createInstance(ChatModel, undefined, { initialLocation: ChatAgentLocation.Chat, canUseTools: true }));
+		const viewModel = disposables.add(instantiationService.createInstance(ChatViewModel, model, undefined));
+		const text = 'test';
+		const request = model.addRequest({
+			text,
+			parts: [new ChatRequestTextPart(new OffsetRange(0, text.length), new Range(1, 1, 1, text.length + 1), text)]
+		}, { variables: [] }, 0);
+		const response = viewModel.getItems().find(isResponseVM);
+		assert.ok(response);
+
+		const container = mainWindow.document.createElement('div');
+		mainWindow.document.body.appendChild(container);
+		disposables.add(toDisposable(() => container.remove()));
+		const renderer = disposables.add(instantiationService.createInstance(
+			ChatListItemRenderer,
+			{} as ChatEditorOptions,
+			{ progressMessageAtBottomOfResponse: true },
+			{
+				getListLength: () => 1,
+				onDidScroll: () => toDisposable(() => { }),
+				container,
+				currentChatMode: () => ChatModeKind.Agent,
+			},
+			undefined,
+			viewModel,
+		));
+		const template = renderer.renderTemplate(container);
+		disposables.add(toDisposable(() => renderer.disposeTemplate(template)));
+		const node = { element: response, children: [], depth: 0, visibleChildrenCount: 0, visibleChildIndex: 0, collapsible: false, collapsed: false, visible: true, filterData: undefined };
+
+		model.acceptResponseProgress(request, { kind: 'thinking', value: 'Thinking ...', id: 'thinking-1' });
+		renderer.renderElement(node, 0, template);
+
+		const toolInvocation = new ChatToolInvocation({
+			invocationMessage: 'Running tool...',
+			pastTenseMessage: 'Tool completed',
+		}, {
+			id: 'my-tool',
+			displayName: 'My Tool',
+			modelDescription: 'Test tool',
+			source: ToolDataSource.Internal,
+		}, 'call-1', undefined, {}, {}, request.id);
+		model.acceptResponseProgress(request, toolInvocation);
+		renderer.renderElement(node, 0, template);
+
+		// Tool completes with an error result.
+		await toolInvocation.didExecuteTool({ content: [], toolResultError: 'Tool failed' });
+		renderer.renderElement(node, 0, template);
+
+		model.acceptResponseProgress(request, { kind: 'markdownContent', content: new MarkdownString('Final response despite error') });
+		renderer.renderElement(node, 0, template);
+		const mountedWhileStreaming = template.value.textContent?.includes('Final response despite error') ?? false;
+
+		request.response?.complete();
+		renderer.renderElement(node, 0, template);
+		assert.deepStrictEqual({
+			mountedWhileStreaming,
+			mountedAfterCompletion: template.value.textContent?.includes('Final response despite error') ?? false,
+		}, {
+			mountedWhileStreaming: true,
+			mountedAfterCompletion: true,
+		});
+
+		disposables.dispose();
+	});
+
+	test('direct markdown-only response without thinking or tools mounts', async () => {
+		const disposables = store.add(new DisposableStore());
+		const instantiationService = workbenchInstantiationService(undefined, disposables);
+		const configurationService = new TestConfigurationService();
+		configurationService.setUserConfiguration(ChatConfiguration.IncrementalRendering, false);
+		configurationService.setUserConfiguration(ChatConfiguration.ThinkingStyle, ThinkingDisplayMode.FixedScrolling);
+		configurationService.setUserConfiguration('chat.agent.thinking.collapsedTools', CollapsedToolsDisplayMode.Always);
+		configurationService.setUserConfiguration('chat.checkpoints.enabled', false);
+		configurationService.setUserConfiguration('chat.checkpoints.showFileChanges', false);
+		configurationService.setUserConfiguration(ChatConfiguration.TurnStatusPills, false);
+		configurationService.setUserConfiguration(ChatConfiguration.Verbose, false);
+		configurationService.setUserConfiguration('workbench.reduceMotion', 'on');
+		instantiationService.stub(IConfigurationService, configurationService);
+		instantiationService.stub(IChatService, new MockChatService());
+		instantiationService.stub(IChatAgentService, disposables.add(instantiationService.createInstance(ChatAgentService)));
+
+		const model = disposables.add(instantiationService.createInstance(ChatModel, undefined, { initialLocation: ChatAgentLocation.Chat, canUseTools: true }));
+		const viewModel = disposables.add(instantiationService.createInstance(ChatViewModel, model, undefined));
+		const text = 'test';
+		const request = model.addRequest({
+			text,
+			parts: [new ChatRequestTextPart(new OffsetRange(0, text.length), new Range(1, 1, 1, text.length + 1), text)]
+		}, { variables: [] }, 0);
+		const response = viewModel.getItems().find(isResponseVM);
+		assert.ok(response);
+
+		const container = mainWindow.document.createElement('div');
+		mainWindow.document.body.appendChild(container);
+		disposables.add(toDisposable(() => container.remove()));
+		const renderer = disposables.add(instantiationService.createInstance(
+			ChatListItemRenderer,
+			{} as ChatEditorOptions,
+			{ progressMessageAtBottomOfResponse: true },
+			{
+				getListLength: () => 1,
+				onDidScroll: () => toDisposable(() => { }),
+				container,
+				currentChatMode: () => ChatModeKind.Agent,
+			},
+			undefined,
+			viewModel,
+		));
+		const template = renderer.renderTemplate(container);
+		disposables.add(toDisposable(() => renderer.disposeTemplate(template)));
+		const node = { element: response, children: [], depth: 0, visibleChildrenCount: 0, visibleChildIndex: 0, collapsible: false, collapsed: false, visible: true, filterData: undefined };
+
+		// No thinking or tool progress — just direct markdown.
+		model.acceptResponseProgress(request, { kind: 'markdownContent', content: new MarkdownString('Simple direct response') });
+		renderer.renderElement(node, 0, template);
+		const mountedWhileStreaming = template.value.textContent?.includes('Simple direct response') ?? false;
+
+		request.response?.complete();
+		renderer.renderElement(node, 0, template);
+		assert.deepStrictEqual({
+			mountedWhileStreaming,
+			mountedAfterCompletion: template.value.textContent?.includes('Simple direct response') ?? false,
+		}, {
+			mountedWhileStreaming: true,
+			mountedAfterCompletion: true,
+		});
+
+		disposables.dispose();
+	});
+
 	// End-to-end regression test for https://github.com/microsoft/vscode/issues/326952: a height
 	// measured synchronously *during* the render pass must be deferred (not fired re-entrantly and
 	// not stored), then reliably delivered to the tree afterwards via a re-measure — so streamed
