@@ -17,6 +17,8 @@ import { URI } from '../../../../../../base/common/uri.js';
 import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../../base/test/common/utils.js';
 import { workbenchInstantiationService } from '../../../../../test/browser/workbenchTestServices.js';
 import { buildPlanReviewProgressContent, ChatListItemRenderer, endsWithSubagentContent, getWorkingProgressRelevantParts, IChatListItemTemplate, isWaitingForMcpServers, reconcileChatItemHeight, renderChatRequestTimestamp, renderChatResponseDetails, shouldCreateGroupedThinkingPart, shouldHideChatUserIdentity, shouldPinToolInvocationToThinking, shouldRenderInitialProgressiveContentImmediately, shouldScheduleInitialHeightChange, shouldShowFileChangesSummaryForSettings, shouldShowPillsSummaryForSettings, shouldStartNewCollapsedThinkingGroup } from '../../../browser/widget/chatListRenderer.js';
+import { codeblockHasClosingBackticks } from '../../../browser/widget/chatContentParts/chatMarkdownContentPart.js';
+import { hasCodeblockUriTag } from '../../../common/widget/annotations.js';
 import { isChatTurnStatusPillsEnabled } from '../../../browser/widget/chatTurnPills.js';
 import { IChatMcpServersStartingSlow, IChatService, IChatToolInvocation, IChatToolInvocationSerialized, ToolConfirmKind } from '../../../common/chatService/chatService.js';
 import { formatChatRequestTimestamp, formatChatResponseDetails, formatElapsedTime } from '../../../common/chatProgressFormatting.js';
@@ -1179,6 +1181,68 @@ suite('ChatListRenderer', () => {
 
 		disposables.dispose();
 	});
+
+	suite('codeblockHasClosingBackticks', () => {
+		test('detects standard closing backticks preceded by newline', () => {
+			assert.strictEqual(codeblockHasClosingBackticks('```typescript\nconst x = 1;\n```'), true);
+		});
+
+		test('detects closing with four backticks', () => {
+			assert.strictEqual(codeblockHasClosingBackticks('````\ncode\n````'), true);
+		});
+
+		test('returns false for incomplete code block', () => {
+			assert.strictEqual(codeblockHasClosingBackticks('```typescript\nconst x = 1;'), false);
+		});
+
+		test('returns false for empty string', () => {
+			assert.strictEqual(codeblockHasClosingBackticks(''), false);
+		});
+
+		test('trims trailing whitespace before checking', () => {
+			assert.strictEqual(codeblockHasClosingBackticks('```ts\ncode\n```  '), true);
+		});
+
+		test('returns false when backticks are not preceded by newline', () => {
+			assert.strictEqual(codeblockHasClosingBackticks('```typescript\ncode```'), false);
+		});
+
+		test('handles markdown with multiple code blocks', () => {
+			assert.strictEqual(codeblockHasClosingBackticks('text\n```js\nfirst\n```\nmore\n```py\nsecond\n```'), true);
+		});
+
+		test('returns false for inline code only', () => {
+			assert.strictEqual(codeblockHasClosingBackticks('use `code` here'), false);
+		});
+	});
+
+	suite('hasCodeblockUriTag', () => {
+		test('returns true for text containing a codeblock URI tag', () => {
+			assert.strictEqual(hasCodeblockUriTag('<vscode_codeblock_uri>file:///test.ts</vscode_codeblock_uri>'), true);
+		});
+
+		test('returns true for edit codeblock URI tag', () => {
+			assert.strictEqual(hasCodeblockUriTag('<vscode_codeblock_uri isEdit>file:///test.ts</vscode_codeblock_uri>'), true);
+		});
+
+		test('returns true for codeblock URI tag with subAgentInvocationId', () => {
+			assert.strictEqual(hasCodeblockUriTag('<vscode_codeblock_uri isEdit subAgentInvocationId="agent-1">file:///test.ts</vscode_codeblock_uri>'), true);
+		});
+
+		test('returns false for plain text', () => {
+			assert.strictEqual(hasCodeblockUriTag('some plain text'), false);
+		});
+
+		test('returns false for partial prefix', () => {
+			assert.strictEqual(hasCodeblockUriTag('<vscode_codebloc'), false);
+		});
+
+		test('returns true when tag appears among other content', () => {
+			assert.strictEqual(hasCodeblockUriTag('some text <vscode_codeblock_uri>file:///a.ts</vscode_codeblock_uri> more text'), true);
+		});
+	});
+
+
 
 	// End-to-end regression test for https://github.com/microsoft/vscode/issues/326952: a height
 	// measured synchronously *during* the render pass must be deferred (not fired re-entrantly and
