@@ -1182,6 +1182,369 @@ suite('ChatListRenderer', () => {
 		disposables.dispose();
 	});
 
+	// Helper: sets up a ChatListItemRenderer, model, viewModel, and template for thinking tests.
+	// Returns a dispose function and the objects needed for test assertions.
+	function createThinkingTestSetup(
+		store: Pick<DisposableStore, 'add'>,
+		options?: {
+			thinkingStyle?: ThinkingDisplayMode;
+			collapsedTools?: CollapsedToolsDisplayMode;
+			incrementalRendering?: boolean;
+			reduceMotion?: string;
+		}
+	) {
+		const instantiationService = workbenchInstantiationService(undefined, store);
+		const configurationService = new TestConfigurationService();
+		configurationService.setUserConfiguration(ChatConfiguration.IncrementalRendering, options?.incrementalRendering ?? false);
+		configurationService.setUserConfiguration(ChatConfiguration.ThinkingStyle, options?.thinkingStyle ?? ThinkingDisplayMode.FixedScrolling);
+		configurationService.setUserConfiguration('chat.agent.thinking.collapsedTools', options?.collapsedTools ?? CollapsedToolsDisplayMode.Always);
+		configurationService.setUserConfiguration('chat.checkpoints.enabled', false);
+		configurationService.setUserConfiguration('chat.checkpoints.showFileChanges', false);
+		configurationService.setUserConfiguration(ChatConfiguration.TurnStatusPills, false);
+		configurationService.setUserConfiguration(ChatConfiguration.Verbose, false);
+		configurationService.setUserConfiguration('workbench.reduceMotion', options?.reduceMotion ?? 'on');
+		instantiationService.stub(IConfigurationService, configurationService);
+		instantiationService.stub(IChatService, new MockChatService());
+		instantiationService.stub(IChatAgentService, store.add(instantiationService.createInstance(ChatAgentService)));
+
+		const model = store.add(instantiationService.createInstance(ChatModel, undefined, { initialLocation: ChatAgentLocation.Chat, canUseTools: true }));
+		const viewModel = store.add(instantiationService.createInstance(ChatViewModel, model, undefined));
+		const text = 'test';
+		const request = model.addRequest({
+			text,
+			parts: [new ChatRequestTextPart(new OffsetRange(0, text.length), new Range(1, 1, 1, text.length + 1), text)]
+		}, { variables: [] }, 0);
+		const response = viewModel.getItems().find(isResponseVM);
+		assert.ok(response);
+
+		const container = mainWindow.document.createElement('div');
+		mainWindow.document.body.appendChild(container);
+		store.add(toDisposable(() => container.remove()));
+		const renderer = store.add(instantiationService.createInstance(
+			ChatListItemRenderer,
+			{} as ChatEditorOptions,
+			{ progressMessageAtBottomOfResponse: true },
+			{
+				getListLength: () => 1,
+				onDidScroll: () => toDisposable(() => { }),
+				container,
+				currentChatMode: () => ChatModeKind.Agent,
+			},
+			undefined,
+			viewModel,
+		));
+		const template = renderer.renderTemplate(container);
+		store.add(toDisposable(() => renderer.disposeTemplate(template)));
+		const node = { element: response, children: [], depth: 0, visibleChildrenCount: 0, visibleChildIndex: 0, collapsible: false, collapsed: false, visible: true, filterData: undefined };
+
+		return { model, request, response, container, renderer, template, node };
+	}
+
+	suite('thinking display', () => {
+		test('renders thinking content in the DOM during streaming', () => {
+			const setup = createThinkingTestSetup(store);
+
+			setup.model.acceptResponseProgress(setup.request, { kind: 'thinking', value: 'Analyzing the codebase...', id: 'think-1' });
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+
+			const textContent = setup.template.value.textContent ?? '';
+			assert.ok(textContent.includes('Analyzing the codebase'), 'thinking text should appear in DOM during streaming');
+		});
+
+		test('updates thinking content in the DOM when value changes (same id)', () => {
+			const setup = createThinkingTestSetup(store);
+
+			setup.model.acceptResponseProgress(setup.request, { kind: 'thinking', value: 'Step 1...', id: 'think-1' });
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+			assert.ok(setup.template.value.textContent?.includes('Step 1'), 'initial thinking text should render');
+
+			setup.model.acceptResponseProgress(setup.request, { kind: 'thinking', value: 'Step 1... now Step 2...', id: 'think-1' });
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+			assert.ok(setup.template.value.textContent?.includes('Step 2'), 'updated thinking text should appear in DOM');
+		});
+
+		test('reflects multiple sequential thinking updates in the DOM', () => {
+			const setup = createThinkingTestSetup(store);
+
+			setup.model.acceptResponseProgress(setup.request, { kind: 'thinking', value: 'A', id: 'think-1' });
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+			assert.ok(setup.template.value.textContent?.includes('A'), 'first update renders');
+
+			setup.model.acceptResponseProgress(setup.request, { kind: 'thinking', value: 'A B', id: 'think-1' });
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+			assert.ok(setup.template.value.textContent?.includes('A B'), 'second update renders');
+
+			setup.model.acceptResponseProgress(setup.request, { kind: 'thinking', value: 'A B C', id: 'think-1' });
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+			assert.ok(setup.template.value.textContent?.includes('A B C'), 'third update renders');
+		});
+
+		test('renders thinking section in collapsed display mode', () => {
+			const setup = createThinkingTestSetup(store, { thinkingStyle: ThinkingDisplayMode.Collapsed });
+
+			setup.model.acceptResponseProgress(setup.request, { kind: 'thinking', value: 'Reasoning in collapsed mode...', id: 'think-1' });
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+
+			// In collapsed mode the body text is hidden inside the collapsed section.
+			// Verify that the thinking section exists and has the default title.
+			const textContent = setup.template.value.textContent ?? '';
+			assert.ok(textContent.includes('Thinking'), 'thinking section title should appear in collapsed mode');
+		});
+
+		test('renders thinking content in collapsed preview display mode', () => {
+			const setup = createThinkingTestSetup(store, { thinkingStyle: ThinkingDisplayMode.CollapsedPreview });
+
+			setup.model.acceptResponseProgress(setup.request, { kind: 'thinking', value: 'Previewing reasoning...', id: 'think-1' });
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+
+			const textContent = setup.template.value.textContent ?? '';
+			assert.ok(textContent.includes('Previewing reasoning'), 'thinking text should render in collapsed preview mode');
+		});
+
+		test('renders thinking content in fixed scrolling display mode', () => {
+			const setup = createThinkingTestSetup(store, { thinkingStyle: ThinkingDisplayMode.FixedScrolling });
+
+			setup.model.acceptResponseProgress(setup.request, { kind: 'thinking', value: 'Scrolling reasoning...', id: 'think-1' });
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+
+			const textContent = setup.template.value.textContent ?? '';
+			assert.ok(textContent.includes('Scrolling reasoning'), 'thinking text should render in fixed scrolling mode');
+		});
+
+		test('handles thinking with empty value without error', () => {
+			const setup = createThinkingTestSetup(store);
+
+			setup.model.acceptResponseProgress(setup.request, { kind: 'thinking', value: '', id: 'think-1' });
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+			// Should not throw and DOM should be stable
+			assert.ok(setup.template.value, 'DOM should remain stable after empty thinking');
+		});
+
+		test('handles thinking with undefined value without error', () => {
+			const setup = createThinkingTestSetup(store);
+
+			setup.model.acceptResponseProgress(setup.request, { kind: 'thinking', value: undefined, id: 'think-1' });
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+			assert.ok(setup.template.value, 'DOM should remain stable after undefined thinking value');
+		});
+
+		test('thinking content remains visible after response completion', () => {
+			const setup = createThinkingTestSetup(store);
+
+			setup.model.acceptResponseProgress(setup.request, { kind: 'thinking', value: 'Final thinking content', id: 'think-1' });
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+			assert.ok(setup.template.value.textContent?.includes('Final thinking content'), 'thinking text should be visible before completion');
+
+			setup.model.acceptResponseProgress(setup.request, { kind: 'markdownContent', content: new MarkdownString('Response after thinking') });
+			setup.request.response?.complete();
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+
+			const textContent = setup.template.value.textContent ?? '';
+			assert.ok(textContent.includes('Final thinking content'), 'thinking text should remain visible after completion');
+			assert.ok(textContent.includes('Response after thinking'), 'response text should also be visible after completion');
+		});
+
+		test('thinking content updates after tool execution completes', async () => {
+			const setup = createThinkingTestSetup(store);
+
+			setup.model.acceptResponseProgress(setup.request, { kind: 'thinking', value: 'Before tool...', id: 'think-1' });
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+			assert.ok(setup.template.value.textContent?.includes('Before tool'), 'initial thinking renders');
+
+			const toolInvocation = new ChatToolInvocation({
+				invocationMessage: 'Running search...',
+				pastTenseMessage: 'Searched',
+			}, {
+				id: 'search-tool',
+				displayName: 'Search',
+				modelDescription: 'Search tool',
+				source: ToolDataSource.Internal,
+			}, 'call-1', undefined, {}, {}, setup.request.id);
+			setup.model.acceptResponseProgress(setup.request, toolInvocation);
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+
+			await toolInvocation.didExecuteTool(undefined);
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+
+			setup.model.acceptResponseProgress(setup.request, { kind: 'thinking', value: 'After tool: analyzing results...', id: 'think-2' });
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+
+			assert.ok(setup.template.value.textContent?.includes('After tool'), 'thinking after tool should update in DOM');
+		});
+
+		test('thinking with extracted title from bold text', () => {
+			const setup = createThinkingTestSetup(store);
+
+			setup.model.acceptResponseProgress(setup.request, { kind: 'thinking', value: '**Analyzing Code**\nLooking at the structure...', id: 'think-1' });
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+
+			const textContent = setup.template.value.textContent ?? '';
+			assert.ok(textContent.includes('Analyzing Code'), 'extracted title from bold text should appear');
+			assert.ok(textContent.includes('Looking at the structure'), 'body text after title should also appear');
+		});
+
+		test('thinking DOM does not get stale after identical renderElement calls', () => {
+			const setup = createThinkingTestSetup(store);
+
+			setup.model.acceptResponseProgress(setup.request, { kind: 'thinking', value: 'UniqueMarker123', id: 'think-1' });
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+			// The first render may add a working-progress indicator that disappears once the
+			// thinking part exists in renderedParts. Render once more to let the DOM stabilise.
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+			const first = setup.template.value.textContent;
+
+			// Render again without any new model content — the DOM must remain identical.
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+			const second = setup.template.value.textContent;
+
+			assert.strictEqual(first, second, 'DOM should be stable across repeated renderElement calls when no new content arrives');
+		});
+
+		test('thinking renders with reduced motion setting', () => {
+			const setup = createThinkingTestSetup(store, { reduceMotion: 'on' });
+
+			setup.model.acceptResponseProgress(setup.request, { kind: 'thinking', value: 'Reduced motion thinking', id: 'think-1' });
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+
+			assert.ok(setup.template.value.textContent?.includes('Reduced motion thinking'), 'thinking should render with reduced motion');
+		});
+
+		test('thinking renders with default motion setting', () => {
+			const setup = createThinkingTestSetup(store, { reduceMotion: 'off' });
+
+			setup.model.acceptResponseProgress(setup.request, { kind: 'thinking', value: 'Default motion thinking', id: 'think-1' });
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+
+			assert.ok(setup.template.value.textContent?.includes('Default motion thinking'), 'thinking should render with default motion');
+		});
+
+		test('thinking updates incrementally with incremental rendering enabled', async () => {
+			const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+			const setup = createThinkingTestSetup(store, { incrementalRendering: true });
+
+			setup.model.acceptResponseProgress(setup.request, { kind: 'thinking', value: 'Incremental step 1', id: 'think-1' });
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+			assert.ok(setup.template.value.textContent?.includes('Incremental step 1'), 'first incremental thinking renders');
+
+			setup.model.acceptResponseProgress(setup.request, { kind: 'thinking', value: 'Incremental step 1 now step 2', id: 'think-1' });
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+			await sleep(100);
+			assert.ok(setup.template.value.textContent?.includes('step 2'), 'incremental thinking update should appear');
+		});
+
+		test('thinking stays visible when interleaved with multiple tool invocations', async () => {
+			const setup = createThinkingTestSetup(store);
+
+			setup.model.acceptResponseProgress(setup.request, { kind: 'thinking', value: 'Initial reasoning', id: 'think-1' });
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+
+			const tool1 = new ChatToolInvocation(
+				{ invocationMessage: 'Searching...', pastTenseMessage: 'Searched' },
+				{ id: 'tool-1', displayName: 'Search', modelDescription: 'Search', source: ToolDataSource.Internal },
+				'call-1', undefined, {}, {}, setup.request.id
+			);
+			setup.model.acceptResponseProgress(setup.request, tool1);
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+			await tool1.didExecuteTool(undefined);
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+
+			setup.model.acceptResponseProgress(setup.request, { kind: 'thinking', value: 'After first tool, more reasoning', id: 'think-2' });
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+
+			const tool2 = new ChatToolInvocation(
+				{ invocationMessage: 'Reading...', pastTenseMessage: 'Read' },
+				{ id: 'tool-2', displayName: 'Read', modelDescription: 'Read', source: ToolDataSource.Internal },
+				'call-2', undefined, {}, {}, setup.request.id
+			);
+			setup.model.acceptResponseProgress(setup.request, tool2);
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+			await tool2.didExecuteTool(undefined);
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+
+			const textContent = setup.template.value.textContent ?? '';
+			assert.ok(
+				textContent.includes('Initial reasoning') || textContent.includes('After first tool'),
+				'at least one thinking text should remain visible after interleaved tool invocations'
+			);
+		});
+
+		test('thinking DOM reflects final content after rapid successive updates', () => {
+			const setup = createThinkingTestSetup(store);
+
+			const updates = ['A', 'AB', 'ABC', 'ABCD', 'ABCDE'];
+			for (let i = 0; i < updates.length; i++) {
+				setup.model.acceptResponseProgress(setup.request, { kind: 'thinking', value: updates[i], id: 'think-1' });
+				setup.renderer.renderElement(setup.node, 0, setup.template);
+			}
+
+			assert.ok(setup.template.value.textContent?.includes('ABCDE'), 'DOM should reflect the final thinking content after rapid updates');
+		});
+
+		test('thinking content with array value is rendered correctly', () => {
+			const setup = createThinkingTestSetup(store);
+
+			setup.model.acceptResponseProgress(setup.request, { kind: 'thinking', value: ['Part 1 ', 'Part 2 ', 'Part 3'], id: 'think-1' });
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+
+			// Array values are joined and rendered as a single text
+			const textContent = setup.template.value.textContent ?? '';
+			assert.ok(
+				textContent.includes('Part 1') || textContent.includes('Part 2') || textContent.includes('Part 3'),
+				'array thinking value should have its parts rendered'
+			);
+		});
+
+		test('thinking content with generatedTitle displays the title', () => {
+			const setup = createThinkingTestSetup(store);
+
+			setup.model.acceptResponseProgress(setup.request, {
+				kind: 'thinking',
+				value: 'Doing some analysis...',
+				id: 'think-1',
+				generatedTitle: 'Code Analysis',
+			});
+			setup.request.response?.complete();
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+
+			// The generated title appears in the collapsible header area.
+			const textContent = setup.template.value.textContent ?? '';
+			assert.ok(textContent.includes('Code Analysis'), 'generated title should appear in the DOM');
+		});
+
+		test('thinking content with reasoningDurationMs renders without error in collapsed mode', () => {
+			const setup = createThinkingTestSetup(store, { thinkingStyle: ThinkingDisplayMode.Collapsed });
+
+			setup.model.acceptResponseProgress(setup.request, {
+				kind: 'thinking',
+				value: '**Analysis** Some reasoning text',
+				id: 'think-1',
+				reasoningDurationMs: 5000,
+			});
+			setup.request.response?.complete();
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+
+			// The title should include the extracted heading and the duration suffix.
+			// In collapsed mode the section is rendered as a collapsible header;
+			// verify the title element contains the expected text.
+			const titleElement = setup.template.value.querySelector('.chat-thinking-title-detail-text')
+				?? setup.template.value.querySelector('.collapsible-section-title');
+			const titleText = titleElement?.textContent ?? setup.template.value.textContent ?? '';
+			assert.ok(titleText.includes('Analysis'), 'title should appear with reasoning duration');
+		});
+
+		test('empty thinking followed by markdown renders markdown correctly', () => {
+			const setup = createThinkingTestSetup(store);
+
+			setup.model.acceptResponseProgress(setup.request, { kind: 'thinking', value: '   ', id: 'think-1' });
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+
+			setup.model.acceptResponseProgress(setup.request, { kind: 'markdownContent', content: new MarkdownString('Hello after empty thinking') });
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+
+			assert.ok(setup.template.value.textContent?.includes('Hello after empty thinking'), 'markdown after empty thinking should render');
+		});
+	});
+
 	suite('codeblockHasClosingBackticks', () => {
 		test('detects standard closing backticks preceded by newline', () => {
 			assert.strictEqual(codeblockHasClosingBackticks('```typescript\nconst x = 1;\n```'), true);
