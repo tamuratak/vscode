@@ -18,6 +18,7 @@ import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../../base/
 import { workbenchInstantiationService } from '../../../../../test/browser/workbenchTestServices.js';
 import { buildPlanReviewProgressContent, ChatListItemRenderer, endsWithSubagentContent, getWorkingProgressRelevantParts, IChatListItemTemplate, isWaitingForMcpServers, reconcileChatItemHeight, renderChatRequestTimestamp, renderChatResponseDetails, shouldCreateGroupedThinkingPart, shouldHideChatUserIdentity, shouldPinToolInvocationToThinking, shouldRenderInitialProgressiveContentImmediately, shouldScheduleInitialHeightChange, shouldShowFileChangesSummaryForSettings, shouldShowPillsSummaryForSettings, shouldStartNewCollapsedThinkingGroup } from '../../../browser/widget/chatListRenderer.js';
 import { codeblockHasClosingBackticks } from '../../../browser/widget/chatContentParts/chatMarkdownContentPart.js';
+import { ChatWorkingProgressContentPart } from '../../../browser/widget/chatContentParts/chatProgressContentPart.js';
 import { hasCodeblockUriTag } from '../../../common/widget/annotations.js';
 import { isChatTurnStatusPillsEnabled } from '../../../browser/widget/chatTurnPills.js';
 import { IChatMcpServersStartingSlow, IChatService, IChatToolInvocation, IChatToolInvocationSerialized, ToolConfirmKind } from '../../../common/chatService/chatService.js';
@@ -108,6 +109,19 @@ suite('ChatListRenderer', () => {
 				[{ kind: 'none', height: 500, stored: 500 }],
 				[{ kind: 'scheduleInitial', height: 700, stored: 700 }],
 			]);
+		});
+
+		test('does not store an initial height measured during rendering', () => {
+			assert.deepStrictEqual(
+				run([
+					{ measured: 700, isBeingRendered: true },
+					{ measured: 700, isBeingRendered: false },
+				], /*allocatedHeight*/ 500, /*initialStored*/ undefined),
+				[
+					{ kind: 'deferReMeasure', height: 700, stored: undefined },
+					{ kind: 'scheduleInitial', height: 700, stored: 700 },
+				],
+			);
 		});
 	});
 
@@ -334,16 +348,22 @@ suite('ChatListRenderer', () => {
 				executionConfirmation: shouldPinToolInvocationToThinking(IChatToolInvocation.StateKind.WaitingForConfirmation, false, false),
 				resultApproval: shouldPinToolInvocationToThinking(IChatToolInvocation.StateKind.WaitingForPostApproval, false, false),
 				authentication: shouldPinToolInvocationToThinking(IChatToolInvocation.StateKind.WaitingForAuthentication, false, false),
+				streaming: shouldPinToolInvocationToThinking(IChatToolInvocation.StateKind.Streaming, false, false),
 				executingWithConfirmation: shouldPinToolInvocationToThinking(IChatToolInvocation.StateKind.Executing, true, false),
 				executingWithoutConfirmation: shouldPinToolInvocationToThinking(IChatToolInvocation.StateKind.Executing, false, false),
+				completed: shouldPinToolInvocationToThinking(IChatToolInvocation.StateKind.Completed, false, false),
+				cancelled: shouldPinToolInvocationToThinking(IChatToolInvocation.StateKind.Cancelled, false, false),
 				executingWithMcpApp: shouldPinToolInvocationToThinking(IChatToolInvocation.StateKind.Executing, false, true),
 				streamingWithMcpApp: shouldPinToolInvocationToThinking(IChatToolInvocation.StateKind.Streaming, false, true),
 			}, {
 				executionConfirmation: false,
 				resultApproval: false,
 				authentication: false,
+				streaming: true,
 				executingWithConfirmation: false,
 				executingWithoutConfirmation: true,
+				completed: true,
+				cancelled: true,
 				executingWithMcpApp: false,
 				streamingWithMcpApp: false,
 			});
@@ -391,6 +411,60 @@ suite('ChatListRenderer', () => {
 
 			assert.strictEqual(content.value, 'Approved&nbsp;plan\n\n## Plan summary\n\n[Open full plan file (plan.md)](file:///sessions/abc/plan.md?vscodeLinkType=file)');
 		});
+
+		test('does not expose plan content while review is pending', () => {
+			const content = buildPlanReviewProgressContent({
+				kind: 'planReview',
+				title: 'Review Plan',
+				content: '## Secret plan details',
+				actions: [{ id: 'interactive', label: 'Implement Plan' }],
+				canProvideFeedback: true,
+				planUri: URI.file('/sessions/abc/plan.md').toJSON(),
+				isUsed: false,
+				data: undefined,
+			}, 'Plan review required');
+
+			assert.deepStrictEqual({
+				value: content.value,
+				containsPlan: content.value.includes('Secret plan details'),
+				containsLink: content.value.includes('plan.md'),
+			}, {
+				value: 'Plan&nbsp;review&nbsp;required',
+				containsPlan: false,
+				containsLink: false,
+			});
+		});
+
+		test('renders structured feedback and preserves an existing plan URI query', () => {
+			const feedback = buildPlanReviewProgressContent({
+				kind: 'planReview',
+				title: 'Review Plan',
+				content: '',
+				actions: [{ id: 'interactive', label: 'Implement Plan' }],
+				canProvideFeedback: true,
+				planUri: URI.parse('file:///sessions/abc/plan.md?view=full').toJSON(),
+				isUsed: true,
+				data: {
+					rejected: false,
+					action: 'Implement Plan',
+					actionId: 'interactive',
+					feedbackOverall: 'Needs more detail',
+					feedbackInlineMarkdown: '**Inline comment**',
+				},
+			}, 'Provided feedback');
+
+			assert.deepStrictEqual({
+				value: feedback.value,
+				containsNormalizedFeedback: feedback.value.includes('Provided&nbsp;feedback:&nbsp;Needs&nbsp;more&nbsp;detail'),
+				containsInlineFeedback: feedback.value.includes('**Inline comment**'),
+				planLink: feedback.value.match(/\]\([^)]*\)/)?.[0],
+			}, {
+				value: 'Provided&nbsp;feedback:&nbsp;Needs&nbsp;more&nbsp;detail\n\n[Open full plan file (plan.md)](file:///sessions/abc/plan.md?view=full&vscodeLinkType=file)\n\n**Inline comment**',
+				containsNormalizedFeedback: true,
+				containsInlineFeedback: true,
+				planLink: '](file:///sessions/abc/plan.md?view=full&vscodeLinkType=file)',
+			});
+		});
 	});
 
 	test('working progress ignores subagent-owned response parts', () => {
@@ -414,12 +488,20 @@ suite('ChatListRenderer', () => {
 			subAgentInvocationId: 'subagent-1',
 			toolSpecificData: undefined,
 		};
+		const regularTool: IChatToolInvocationSerialized = {
+			...childTool,
+			toolCallId: 'regular-1',
+			subAgentInvocationId: undefined,
+		};
 		const parts: IChatRendererContent[] = [
 			{ kind: 'references', references: [] },
 			parentSubagent,
 			childTool,
 			{ kind: 'markdownContent', content: { value: '<vscode_codeblock_uri subAgentInvocationId="subagent-1">file:///test.txt</vscode_codeblock_uri>' } },
 			{ kind: 'hook', hookType: 'PreToolUse', subAgentInvocationId: 'subagent-1' },
+			regularTool,
+			{ kind: 'markdownContent', content: { value: 'regular response' } },
+			{ kind: 'hook', hookType: 'PostToolUse' },
 		];
 
 		assert.deepStrictEqual({
@@ -428,12 +510,17 @@ suite('ChatListRenderer', () => {
 			endsWithSubagentHook: endsWithSubagentContent(parts),
 			endsWithSubagentChildTool: endsWithSubagentContent(parts.slice(0, 3)),
 			endsWithParentSubagentTool: endsWithSubagentContent(parts.slice(0, 2)),
+			endsWithParentSubagentToolBeforeEmptyMarkdown: endsWithSubagentContent([
+				...parts.slice(0, 2),
+				{ kind: 'markdownContent', content: { value: '  \n' } },
+			]),
 		}, {
-			relevantParts: ['references'],
+			relevantParts: ['references', 'toolInvocationSerialized', 'markdownContent', 'hook'],
 			endsWithTaggedMarkdown: false,
 			endsWithSubagentHook: false,
 			endsWithSubagentChildTool: false,
 			endsWithParentSubagentTool: true,
+			endsWithParentSubagentToolBeforeEmptyMarkdown: true,
 		});
 	});
 
@@ -1191,6 +1278,7 @@ suite('ChatListRenderer', () => {
 			collapsedTools?: CollapsedToolsDisplayMode;
 			incrementalRendering?: boolean;
 			reduceMotion?: string;
+			collapseCompletedResponses?: boolean;
 		}
 	) {
 		const instantiationService = workbenchInstantiationService(undefined, store);
@@ -1202,6 +1290,7 @@ suite('ChatListRenderer', () => {
 		configurationService.setUserConfiguration('chat.checkpoints.showFileChanges', false);
 		configurationService.setUserConfiguration(ChatConfiguration.TurnStatusPills, false);
 		configurationService.setUserConfiguration(ChatConfiguration.Verbose, false);
+		configurationService.setUserConfiguration(ChatConfiguration.CollapseCompletedResponses, options?.collapseCompletedResponses ?? false);
 		configurationService.setUserConfiguration('workbench.reduceMotion', options?.reduceMotion ?? 'on');
 		instantiationService.stub(IConfigurationService, configurationService);
 		instantiationService.stub(IChatService, new MockChatService());
@@ -1239,6 +1328,73 @@ suite('ChatListRenderer', () => {
 
 		return { model, request, response, container, renderer, template, node };
 	}
+
+	suite('completed response disclosure', () => {
+		test('keeps the final response outside the disclosure and does not duplicate it on rerender', async () => {
+			const setup = createThinkingTestSetup(store, {
+				collapsedTools: CollapsedToolsDisplayMode.Off,
+				collapseCompletedResponses: true,
+			});
+
+			setup.model.acceptResponseProgress(setup.request, { kind: 'thinking', value: 'Reasoning step', id: 'think-1' });
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+
+			const toolInvocation = new ChatToolInvocation({
+				invocationMessage: 'Running tool...',
+				pastTenseMessage: 'Tool completed',
+			}, {
+				id: 'my-tool',
+				displayName: 'My Tool',
+				modelDescription: 'Test tool',
+				source: ToolDataSource.Internal,
+			}, 'call-1', undefined, {}, {}, setup.request.id);
+			setup.model.acceptResponseProgress(setup.request, toolInvocation);
+			await toolInvocation.didExecuteTool(undefined);
+			setup.model.acceptResponseProgress(setup.request, { kind: 'markdownContent', content: new MarkdownString('Final response') });
+			setup.request.response?.complete();
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+
+			const disclosure = setup.template.value.querySelector('details.completed-response-disclosure');
+			const summary = disclosure?.querySelector('.completed-response-summary')?.textContent;
+			const finalResponseInDisclosure = disclosure?.textContent?.includes('Final response') ?? false;
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+
+			assert.deepStrictEqual({
+				disclosureCount: setup.template.value.querySelectorAll('details.completed-response-disclosure').length,
+				summary,
+				finalResponseMounted: setup.template.value.textContent?.includes('Final response') ?? false,
+				finalResponseInDisclosure,
+			}, {
+				disclosureCount: 1,
+				summary: 'Completed 2 steps',
+				finalResponseMounted: true,
+				finalResponseInDisclosure: false,
+			});
+		});
+	});
+
+	suite('working progress display', () => {
+		test('suppresses generic progress while MCP servers start', () => {
+			const setup = createThinkingTestSetup(store);
+			const servers = observableValue('servers', [{ id: 'a', name: 'alpha' }]);
+			const part: IChatMcpServersStartingSlow = {
+				kind: 'mcpServersStartingSlow',
+				sessionResource: setup.response.sessionResource,
+				servers,
+			};
+
+			setup.model.acceptResponseProgress(setup.request, part);
+			setup.renderer.renderElement(setup.node, 0, setup.template);
+			const hasWorkingProgress = setup.template.renderedParts?.some(part => part instanceof ChatWorkingProgressContentPart) ?? false;
+			const mcpProgress = setup.template.value.querySelector<HTMLElement>('.chat-mcp-servers-interaction');
+			const hasMcpProgress = !!mcpProgress && mcpProgress.style.display !== 'none';
+
+			assert.deepStrictEqual({ hasWorkingProgress, hasMcpProgress }, {
+				hasWorkingProgress: false,
+				hasMcpProgress: true,
+			});
+		});
+	});
 
 	suite('thinking display', () => {
 		test('renders thinking content in the DOM during streaming', () => {
