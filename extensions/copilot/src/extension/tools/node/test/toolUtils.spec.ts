@@ -585,8 +585,12 @@ describe('encodeUrlHostname', () => {
 });
 
 class MultiRootWorkspaceService extends NullWorkspaceService {
+	constructor(workspaceFolders: URI[], private readonly folderNames = new Map<string, string>()) {
+		super(workspaceFolders);
+	}
+
 	override getWorkspaceFolderName(workspaceFolderUri: URI): string {
-		return posix.basename(workspaceFolderUri.path);
+		return this.folderNames.get(workspaceFolderUri.toString()) ?? posix.basename(workspaceFolderUri.path);
 	}
 }
 
@@ -706,6 +710,32 @@ describe('inputGlobToPattern - multi-root workspace', () => {
 		expect(result.patterns).toHaveLength(1);
 		expect(result.patterns[0]).toBe('src/**/*.ts');
 		expect(result.folderName).toBeUndefined();
+	});
+});
+
+describe('inputGlobToPattern - configured workspace folder names', () => {
+	const folder1 = URI.file('/workspace/alpha-svc');
+	const folder2 = URI.file('/workspace/beta-svc');
+	const workspaceService = new MultiRootWorkspaceService([folder1, folder2], new Map([
+		[folder1.toString(), 'Alpha Service'],
+		[folder2.toString(), 'Beta Service'],
+	]));
+	const workingDirectory = new WorkingDirectory(undefined, workspaceService);
+
+	test('resolves a configured folder name that differs from the directory name', () => {
+		const result = inputGlobToPattern('Alpha Service/notes.md', workingDirectory, undefined);
+
+		expect(result.patterns).toHaveLength(1);
+		expect(result.patterns[0]).toMatchObject({ baseUri: folder1, pattern: 'notes.md' });
+		expect(result.folderName).toBe('Alpha Service');
+	});
+
+	test('resolves the directory basename as a folder name alias when it is unambiguous', () => {
+		const result = inputGlobToPattern('alpha-svc/notes.md', workingDirectory, undefined);
+
+		expect(result.patterns).toHaveLength(1);
+		expect(result.patterns[0]).toMatchObject({ baseUri: folder1, pattern: 'notes.md' });
+		expect(result.folderName).toBe('Alpha Service');
 	});
 });
 
