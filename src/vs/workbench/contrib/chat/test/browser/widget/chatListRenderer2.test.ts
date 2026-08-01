@@ -455,11 +455,11 @@ suite('ChatListRenderer', () => {
 
 			assert.deepStrictEqual({
 				value: feedback.value,
-				containsNormalizedFeedback: feedback.value.includes('Provided&nbsp;feedback:&nbsp;Needs&nbsp;more&nbsp;detail'),
+				containsNormalizedFeedback: feedback.value.includes('Provided&nbsp;feedback\n\nNeeds more detail'),
 				containsInlineFeedback: feedback.value.includes('**Inline comment**'),
 				planLink: feedback.value.match(/\]\([^)]*\)/)?.[0],
 			}, {
-				value: 'Provided&nbsp;feedback:&nbsp;Needs&nbsp;more&nbsp;detail\n\n[Open full plan file (plan.md)](file:///sessions/abc/plan.md?view=full&vscodeLinkType=file)\n\n**Inline comment**',
+				value: 'Provided&nbsp;feedback\n\nNeeds more detail\n\n**Inline comment**\n\n[Open full plan file (plan.md)](file:///sessions/abc/plan.md?view=full&vscodeLinkType=file)',
 				containsNormalizedFeedback: true,
 				containsInlineFeedback: true,
 				planLink: '](file:///sessions/abc/plan.md?view=full&vscodeLinkType=file)',
